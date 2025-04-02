@@ -14,7 +14,6 @@ TOKEN = os.getenv("TOKEN_SM")
 if not TOKEN:
     raise ValueError("❌ Bot token not found in .env file")
 
-
 class Bot(commands.Bot):
     def __init__(self):
         # Configure intents
