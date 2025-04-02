@@ -230,19 +230,19 @@ async def kick(interaction: discord.Interaction, member: discord.Member, reason:
         print(f"Error in kick command: {e}")
         await interaction.response.send_message("❌ Failed to kick member!", ephemeral=True)
 
-@bot.tree.command(name="sticky", description="Create or remove sticky messages")
+@bot.tree.command(name="sticky", description="Create sticky messages")
 @app_commands.describe(
-    action="Choose create, create-embed, or remove",
+    action="Choose create or create-embed",
     title="Title for embed (only for create-embed)",
     description="Message content or embed description",
+    name="Name for your sticky message (used to identify it later)",
     color="Color for embed (optional)",
     cooldown="Cooldown in seconds between sticky messages(default: 1)"
 )
 @app_commands.choices(
     action=[
         app_commands.Choice(name="create", value="create"),
-        app_commands.Choice(name="create-embed", value="create-embed"),
-        app_commands.Choice(name="remove", value="remove")
+        app_commands.Choice(name="create-embed", value="create-embed")
     ],
     color=[
         app_commands.Choice(name="blue", value="blue"),
@@ -255,87 +255,165 @@ async def kick(interaction: discord.Interaction, member: discord.Member, reason:
 async def sticky(
     interaction: discord.Interaction,
     action: str,
-    description: str = None,
+    description: str,
+    name: str,
     title: str = None,
     color: str = "blue",
     cooldown: int = 1
 ):
     try:
         channel_id = interaction.channel.id
+        guild_id = interaction.guild.id
         
-        if action == "create" or action == "create-embed":
-            if not description:
-                await interaction.response.send_message(
-                    "❌ Please provide a message!", 
-                    ephemeral=True
-                )
-                return
+        # Initialize guild sticky messages tracking if not exists
+        if not hasattr(bot, 'guild_sticky_messages'):
+            bot.guild_sticky_messages = {}
+        if guild_id not in bot.guild_sticky_messages:
+            bot.guild_sticky_messages[guild_id] = {}
             
-            # Store cooldown
-            bot.sticky_cooldowns[channel_id] = cooldown
-            bot.sticky_last_sent[channel_id] = datetime.utcnow()
+        # Store cooldown
+        bot.sticky_cooldowns[channel_id] = cooldown
+        bot.sticky_last_sent[channel_id] = datetime.utcnow()
+        
+        if action == "create":
+            sticky_msg = await interaction.channel.send(description)
+            await bot.update_sticky_message(channel_id, sticky_msg.id, description)
+            # Store sticky message info
+            bot.guild_sticky_messages[guild_id][name] = {
+                'channel_id': channel_id,
+                'message_id': sticky_msg.id,
+                'content': description,
+                'is_embed': False
+            }
+        else:  # create-embed
+            colors = {
+                "blue": discord.Color.blue(),
+                "red": discord.Color.red(),
+                "green": discord.Color.green(),
+                "purple": discord.Color.purple()
+            }
             
-            if action == "create":
-                sticky_msg = await interaction.channel.send(description)
-                await bot.update_sticky_message(channel_id, sticky_msg.id, description)
-            else:  # create-embed
-                colors = {
-                    "blue": discord.Color.blue(),
-                    "red": discord.Color.red(),
-                    "green": discord.Color.green(),
-                    "purple": discord.Color.purple()
-                }
-                
-                embed = discord.Embed(
-                    title=title or "Sticky Message",
-                    description=description,
-                    color=colors.get(color, discord.Color.blue())
-                )
-                embed.set_footer(text=f"Sticky message • {interaction.guild.name} • Cooldown: {cooldown}s")
-                embed.timestamp = discord.utils.utcnow()
-                
-                sticky_msg = await interaction.channel.send(embed=embed)
-                await bot.update_sticky_message(
-                    channel_id,
-                    sticky_msg.id,
-                    {"type": "embed", "title": title, "description": description, "color": color}
-                )
-            
-            await interaction.response.send_message(
-                f"✅ Sticky message created with {cooldown}s cooldown!", 
-                ephemeral=True
+            embed = discord.Embed(
+                title=title or "Sticky Message",
+                description=description,
+                color=colors.get(color, discord.Color.blue())
             )
+            embed.set_footer(text=f"📌 Sticky message • {interaction.guild.name} • Cooldown: {cooldown}s")
+            embed.timestamp = discord.utils.utcnow()
             
-        elif action == "remove":
-            if channel_id not in bot.sticky_messages:
-                await interaction.response.send_message(
-                    "❌ No sticky message here!", 
-                    ephemeral=True
-                )
-                return
-            
-            try:
-                sticky_msg = await interaction.channel.fetch_message(
-                    bot.sticky_messages[channel_id]['message_id']
-                )
-                await sticky_msg.delete()
-            except discord.NotFound:
-                pass
-            
-            # Clean up cooldown data
-            del bot.sticky_messages[channel_id]
-            bot.sticky_cooldowns.pop(channel_id, None)
-            bot.sticky_last_sent.pop(channel_id, None)
-            
-            await interaction.response.send_message(
-                "✅ Sticky message removed!", 
-                ephemeral=True
-            )
+            sticky_msg = await interaction.channel.send(embed=embed)
+            content = {"type": "embed", "title": title, "description": description, "color": color}
+            await bot.update_sticky_message(channel_id, sticky_msg.id, content)
+            # Store sticky message info
+            bot.guild_sticky_messages[guild_id][name] = {
+                'channel_id': channel_id,
+                'message_id': sticky_msg.id,
+                'content': content,
+                'is_embed': True
+            }
+        
+        await interaction.response.send_message(
+            f"✅ Sticky message '{name}' created with {cooldown}s cooldown!", 
+            ephemeral=True
+        )
             
     except Exception as e:
         print(f"Error in sticky command: {e}")
         await interaction.response.send_message(
-            "❌ Failed to manage sticky message!", 
+            "❌ Failed to create sticky message!", 
+            ephemeral=True
+        )
+
+@bot.tree.command(name="stickyremove", description="Remove a sticky message from the server")
+@app_commands.describe(
+    name="Name of the sticky message to remove"
+)
+@app_commands.default_permissions(manage_messages=True)
+async def stickyremove(
+    interaction: discord.Interaction,
+    name: str
+):
+    try:
+        guild_id = interaction.guild.id
+        
+        if not hasattr(bot, 'guild_sticky_messages') or \
+           guild_id not in bot.guild_sticky_messages or \
+           name not in bot.guild_sticky_messages[guild_id]:
+            await interaction.response.send_message(
+                f"❌ No sticky message found with name '{name}'!", 
+                ephemeral=True
+            )
+            return
+            
+        sticky_info = bot.guild_sticky_messages[guild_id][name]
+        channel_id = sticky_info['channel_id']
+        
+        try:
+            channel = interaction.guild.get_channel(channel_id)
+            if channel:
+                sticky_msg = await channel.fetch_message(sticky_info['message_id'])
+                await sticky_msg.delete()
+        except (discord.NotFound, discord.Forbidden):
+            pass  # Message might already be deleted
+        
+        # Clean up tracking data
+        del bot.guild_sticky_messages[guild_id][name]
+        del bot.sticky_messages[channel_id]
+        bot.sticky_cooldowns.pop(channel_id, None)
+        bot.sticky_last_sent.pop(channel_id, None)
+        
+        await interaction.response.send_message(
+            f"✅ Sticky message '{name}' removed!", 
+            ephemeral=True
+        )
+        
+    except Exception as e:
+        print(f"Error in stickyremove command: {e}")
+        await interaction.response.send_message(
+            "❌ Failed to remove sticky message!", 
+            ephemeral=True
+        )
+
+@bot.tree.command(name="stickylist", description="Get information about the server")
+@app_commands.default_permissions(manage_messages=True)
+async def stickylist(interaction: discord.Interaction):
+    try:
+        guild_id = interaction.guild.id
+        
+        if not hasattr(bot, 'guild_sticky_messages') or \
+           guild_id not in bot.guild_sticky_messages or \
+           not bot.guild_sticky_messages[guild_id]:
+            await interaction.response.send_message(
+                "❌ No sticky messages found in this server!", 
+                ephemeral=True
+            )
+            return
+            
+        embed = discord.Embed(
+            title="📌 Sticky Messages",
+            description="List of all sticky messages in this server:",
+            color=discord.Color.blue()
+        )
+        
+        for name, info in bot.guild_sticky_messages[guild_id].items():
+            channel = interaction.guild.get_channel(info['channel_id'])
+            channel_name = channel.name if channel else "deleted-channel"
+            message_type = "Embed" if info['is_embed'] else "Text"
+            embed.add_field(
+                name=name,
+                value=f"Type: {message_type}\nChannel: #{channel_name}",
+                inline=True
+            )
+            
+        embed.set_footer(text=f"Server: {interaction.guild.name}")
+        embed.timestamp = discord.utils.utcnow()
+        
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        
+    except Exception as e:
+        print(f"Error in stickylist command: {e}")
+        await interaction.response.send_message(
+            "❌ Failed to list sticky messages!", 
             ephemeral=True
         )
 
