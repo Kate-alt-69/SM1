@@ -1,0 +1,21 @@
+{
+    "sticky_messages": {},
+    "sticky_cooldowns": {},
+    "guild_sticky_messages": {},
+    "server_info": {
+        "1323743200518733844": {
+            "name": "Funky",
+            "id": 1323743200518733844,
+            "member_count": 16,
+            "icon_url": "https://cdn.discordapp.com/icons/1323743200518733844/1cec633aea4748456167e3f1d89dc074.png?size=1024",
+            "banner_url": null,
+            "description": "No description set",
+            "owner": null,
+            "created_at": null,
+            "roles": 0,
+            "channels": 0,
+            "boost_level": 0,
+            "boost_count": 0
+        }
+    }
+}
