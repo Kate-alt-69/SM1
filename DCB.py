@@ -445,6 +445,87 @@ async def restart(interaction: discord.Interaction):
             content="❌ An error occurred while restarting the bot!"
         )
 
+@bot.tree.command(name="role_channel_permissions", description="Set channel permissions for a role")
+@app_commands.describe(
+    role="The role to modify permissions for",
+    channel="The channel to modify",
+    permission="The permission to modify",
+    value="True to allow, False to deny",
+    all_channels="Whether to apply to all channels"
+)
+@app_commands.choices(
+    permission=[
+        app_commands.Choice(name="View Channel", value="view_channel"),
+        app_commands.Choice(name="Manage Channel", value="manage_channel"),
+        app_commands.Choice(name="Manage Permissions", value="manage_permissions"),
+        app_commands.Choice(name="Create Instant Invite", value="create_instant_invite"),
+        app_commands.Choice(name="Send Messages", value="send_messages"),
+        app_commands.Choice(name="Embed Links", value="embed_links"),
+        app_commands.Choice(name="Attach Files", value="attach_files"),
+        app_commands.Choice(name="Add Reactions", value="add_reactions"),
+        app_commands.Choice(name="Use External Emojis", value="use_external_emojis"),
+        app_commands.Choice(name="Use External Stickers", value="use_external_stickers"),
+        app_commands.Choice(name="Mention Everyone", value="mention_everyone"),
+        app_commands.Choice(name="Manage Messages", value="manage_messages"),
+        app_commands.Choice(name="Read Message History", value="read_message_history"),
+        app_commands.Choice(name="Send TTS Messages", value="send_tts_messages"),
+        app_commands.Choice(name="Use Slash Commands", value="use_application_commands")
+    ]
+)
+@app_commands.default_permissions(administrator=True)
+async def role_channel_permissions(
+    interaction: discord.Interaction,
+    role: discord.Role,
+    channel: discord.TextChannel,
+    permission: str,
+    value: bool,
+    all_channels: bool = False
+):
+    try:
+        await interaction.response.defer(ephemeral=True)
+        
+        if not interaction.user.guild_permissions.manage_roles:
+            await interaction.followup.send("❌ You don't have permission to manage roles!", ephemeral=True)
+            return
+            
+        # Handle channel selection
+        channels_to_update = []
+        if all_channels:
+            channels_to_update = [ch for ch in interaction.guild.channels if isinstance(ch, discord.TextChannel)]
+        else:
+            channels_to_update = [channel]
+            
+        success_count = 0
+        failed_count = 0
+        
+        for ch in channels_to_update:
+            try:
+                perms = ch.overwrites_for(role)
+                setattr(perms, permission, value)
+                await ch.set_permissions(role, overwrite=perms, reason=f"Permission update by {interaction.user}")
+                success_count += 1
+            except Exception as e:
+                print(f"Error setting permissions in channel {ch.name}: {e}")
+                failed_count += 1
+        
+        response = f"✅ Updated permissions for role {role.mention}:\n"
+        response += f"Permission: `{permission}` set to `{value}`\n"
+        if all_channels:
+            response += f"Updated {success_count} channels successfully"
+            if failed_count > 0:
+                response += f" ({failed_count} failed)"
+        else:
+            if success_count > 0:
+                response += f"Channel: {channel.mention}"
+            else:
+                response += "❌ Failed to update permissions"
+        
+        await interaction.followup.send(response, ephemeral=True)
+            
+    except Exception as e:
+        print(f"Error in role_permissions command: {e}")
+        await interaction.followup.send("❌ An error occurred while updating permissions!", ephemeral=True)
+
 if __name__ == "__main__":
     try:
         keep_alive()  # Start the web server
