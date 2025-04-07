@@ -17,5 +17,18 @@
             "boost_level": 0,
             "boost_count": 0
         }
+    },
+    "stored_embeds": {
+        "test": {
+            "title": "This is the Title Made with Embed-create Of Server Manager",
+            "description": "This is The Description From Server Manager",
+            "color": 15158332,
+            "footer": "This is The Footer Text From Server Manager",
+            "thumbnail": null,
+            "image": null,
+            "creator_id": 1150805639774355577,
+            "guild_id": 1323743200518733844,
+            "created_at": 1744019180
+        }
     }
 }
