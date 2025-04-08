@@ -29,6 +29,24 @@
             "creator_id": 1150805639774355577,
             "guild_id": 1323743200518733844,
             "created_at": 1744019180
+        },
+        "New": {
+            "title": "New Embed",
+            "description": "Use the buttons below to customize this embed",
+            "color": 3447003,
+            "footer": null,
+            "thumbnail": null,
+            "image": null,
+            "author": {
+                "name": null,
+                "icon_url": null,
+                "url": null
+            },
+            "fields": [],
+            "timestamp": false,
+            "created_at": 1744144047,
+            "creator_id": 1150805639774355577,
+            "guild_id": 1323743200518733844
         }
     }
 }
