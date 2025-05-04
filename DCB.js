@@ -79,11 +79,16 @@ class Bot extends Client {
 
     async reloadBot() {
         try {
-            await this.application?.commands.set([...this.commands.values()]);
-            console.log("✅ Commands synced!");
+            if (!this.application?.commands) {
+                throw new Error("Application commands not ready");
+            }
+            
+            const guildCommands = this.commands.map(cmd => cmd.data);
+            await this.application.commands.set(guildCommands);
+            console.log(`✅ Successfully registered ${guildCommands.length} commands!`);
             return true;
         } catch (e) {
-            console.error(`❌ Error syncing commands: ${e}`);
+            console.error(`❌ Error syncing commands:`, e);
             return false;
         }
     }
@@ -98,50 +103,24 @@ class Bot extends Client {
 
     async init() {
         await this.dataStorage.loadData();
-        
-        // Load command files directly from commands folder first
+        this.commands.clear();
+
         try {
-            const mainCommandFiles = await fs.readdir(path.join(__dirname, 'commands'));
-            for (const file of mainCommandFiles) {
-                if (file.endsWith('.js')) {
-                    const command = require(path.join(__dirname, 'commands', file));
+            // Load main commands
+            const commandFiles = await fs.readdir(path.join(__dirname, 'commands'));
+            for (const file of commandFiles) {
+                if (file.endsWith('.js') && !file.startsWith('index')) {
+                    const filePath = path.join(__dirname, 'commands', file);
+                    delete require.cache[require.resolve(filePath)];
+                    const command = require(filePath);
                     if (command.data && command.execute) {
                         this.commands.set(command.data.name, command);
-                        console.log(`✅ Loaded command/${file}`);
+                        console.log(`✅ Loaded ${file}`);
                     }
                 }
             }
-        } catch (e) {
-            console.error(`❌ Error loading main commands: ${e}`);
-        }
-
-        // Load subfolders
-        const commandFolders = [
-            'moderation',
-            'roles',
-            'utility',
-            'help',
-            'embed',
-            'sticky'
-        ];
-
-        for (const folder of commandFolders) {
-            const folderPath = path.join(__dirname, 'commands', folder);
-            try {
-                await fs.mkdir(folderPath, { recursive: true });
-                const files = await fs.readdir(folderPath);
-                for (const file of files) {
-                    if (file.endsWith('.js')) {
-                        const command = require(path.join(folderPath, file));
-                        if (command.data && command.execute) {
-                            this.commands.set(command.data.name, command);
-                            console.log(`✅ Loaded ${folder}/${file}`);
-                        }
-                    }
-                }
-            } catch (e) {
-                console.error(`❌ Error loading ${folder}: ${e}`);
-            }
+        } catch (error) {
+            console.error('Error loading commands:', error);
         }
 
         // Start auto-save
@@ -169,17 +148,45 @@ class Bot extends Client {
         await this.init();
         await this.login(TOKEN);
         
+        // Add this line to force refresh commands on startup
+        await this.reloadBot();
+        
         this.user.setActivity('/help | Server Manager', { type: ActivityType.Playing });
         console.log('✅ Bot is online!');
+    }
+
+    // Add proper interaction handling
+    async handleInteraction(interaction) {
+        if (!interaction.isCommand()) return;
+
+        const command = this.commands.get(interaction.commandName);
+        if (!command) return;
+
+        try {
+            await command.execute(interaction);
+        } catch (error) {
+            console.error(error);
+            const errorMessage = { 
+                content: 'Error executing command!', 
+                ephemeral: true 
+            };
+            if (interaction.replied || interaction.deferred) {
+                await interaction.followUp(errorMessage);
+            } else {
+                await interaction.reply(errorMessage);
+            }
+        }
     }
 }
 
 const bot = new Bot();
 
+// Add interaction event handler
+bot.on('interactionCreate', interaction => bot.handleInteraction(interaction));
+
 // Message handling
 bot.on('messageCreate', async (message) => {
     if (message.author.bot) return;
-
     const channelId = message.channel.id;
     if (bot.stickyMessages.has(channelId)) {
         const now = Date.now();
@@ -206,7 +213,6 @@ bot.on('messageCreate', async (message) => {
         }
 
         await new Promise(resolve => setTimeout(resolve, 100));
-
         let newSticky;
         const content = stickyData.content;
 
@@ -216,13 +222,11 @@ bot.on('messageCreate', async (message) => {
                 .setTitle(embedData.title)
                 .setDescription(embedData.description)
                 .setColor(embedData.color);
-
             if (embedData.footer) {
                 embed.setFooter({ text: `${embedData.footer} • 📌 Sticky message • ${message.guild.name}` });
             } else {
                 embed.setFooter({ text: `📌 Sticky message • ${message.guild.name}` });
             }
-
             if (embedData.thumbnail) embed.setThumbnail(embedData.thumbnail);
             if (embedData.image) embed.setImage(embedData.image);
 
