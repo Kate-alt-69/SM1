@@ -1,19 +1,13 @@
-entrypoint = "main.py"
-modules = ["python-3.11"]
+entrypoint = "DCB.js"
+modules = ["nodejs-18:v3-20230608-f4cd419"]
 
 [nix]
 channel = "stable-24_05"
 
-[unitTest]
-language = "python3"
-
-[gitHubImport]
-requiredFiles = [".replit", "replit.nix"]
-
 [deployment]
-run = "python DCB.py"
+run = "node DCB.js"
 deploymentTarget = "cloudrun"
 
 [[ports]]
-localPort = 8080
+localPort = 3000
 externalPort = 80
