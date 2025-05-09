@@ -5,10 +5,11 @@ const fetch = require('node-fetch');
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('fun')
+        .setDescription('Fun commands for entertainment') // Add this description
         .addSubcommand(subcommand =>
             subcommand
                 .setName('8ball')
-                .setDescription('Ask the magic 8-ball a question')
+                .setDescription('Ask the magic 8-ball a question :)')
                 .addStringOption(option =>
                     option.setName('question')
                         .setDescription('The question to ask')
@@ -16,11 +17,11 @@ module.exports = {
         .addSubcommand(subcommand =>
             subcommand
                 .setName('flip')
-                .setDescription('Flip a coin'))
+                .setDescription('Flip a coin, lets see who wins!'))
         .addSubcommand(subcommand =>
             subcommand
                 .setName('roll')
-                .setDescription('Roll a dice')
+                .setDescription('Roll a dice and action')
                 .addIntegerOption(option =>
                     option.setName('sides')
                         .setDescription('Number of sides on the dice')
