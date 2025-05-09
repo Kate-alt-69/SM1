@@ -82,8 +82,15 @@ class Bot extends Client {
             if (!this.application?.commands) {
                 throw new Error("Application commands not ready");
             }
-            
-            const guildCommands = this.commands.map(cmd => cmd.data);
+
+            const guildCommands = this.commands.map(cmd => {
+                if (!cmd.data || !cmd.data.name || !cmd.data.description) {
+                    console.error(`❌ Invalid command data detected:`, cmd.data);
+                    throw new Error(`Invalid command data: ${JSON.stringify(cmd.data)}`);
+                }
+                return cmd.data;
+            });
+
             await this.application.commands.set(guildCommands);
             console.log(`✅ Successfully registered ${guildCommands.length} commands!`);
             return true;
