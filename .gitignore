@@ -87,3 +87,4 @@ $RECYCLE.BIN/
 debug/
 debug.log
 error.log
+node_modules
