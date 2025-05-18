@@ -1,1 +1,1 @@
-Hello This is my Discord Bot!
+Hello This is my Discord Bot! Template.
