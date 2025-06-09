@@ -10,10 +10,15 @@ dotenv.config({ path: path.join(__dirname, '.env') });
 // Fix token loading and validation
 async function loadToken() {
     try {
+        if (process.env.TOKEN_SM) {
+            console.log('Token [ENV] loaded using DEV mode');
+            return process.env.TOKEN_SM;      
+        }
+        console.log('[env] Token no found in .env, loading from config/token.json');
         const data = await fs.readFile(
             path.join(__dirname, 'config', 'token.json'),
             'utf8'
-        );
+        ); 
         const tokenData = JSON.parse(data);
         return tokenData.token;
     } catch (err) {
