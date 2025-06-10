@@ -22,25 +22,30 @@ class CommandManager {
                 console.log('✅ Created commands directory');
             }
 
-            const files = await fs.readdir(this.commandsPath);
-            if (files.length === 0) {
+            const commandFiles = await this.getCommandFiles(this.commandsPath);
+            if (commandFiles.length === 0) {
                 console.warn('⚠️ No command files found');
                 return;
             }
 
             let stats = { loaded: 0, failed: 0, skipped: 0 };
 
-            for (const file of files) {
-                if (!file.endsWith('.js')) {
-                    stats.skipped++;
-                    continue;
-                }
-
+            for (const filePath of commandFiles) {
                 try {
-                    const result = await this.loadCommand(file);
-                    stats[result]++;
+                    delete require.cache[require.resolve(filePath)];
+                    const command = require(filePath);
+                    
+                    if (!command.data?.name || !command.execute) {
+                        console.warn(`⚠️ Invalid command structure in ${filePath}`);
+                        stats.skipped++;
+                        continue;
+                    }
+
+                    this.commands.set(command.data.name, command);
+                    console.log(`✅ Loaded command: ${command.data.name}`);
+                    stats.loaded++;
                 } catch (err) {
-                    console.error(`❌ Failed to load ${file}:`, err.message);
+                    console.error(`❌ Error loading ${filePath}:`, err.message);
                     stats.failed++;
                 }
             }
@@ -55,25 +60,21 @@ class CommandManager {
         }
     }
 
-    async loadCommand(file) {
-        const filePath = path.join(this.commandsPath, file);
-        delete require.cache[require.resolve(filePath)];
-        const command = require(filePath);
+    async getCommandFiles(dir) {
+        const files = await fs.readdir(dir, { withFileTypes: true });
+        let commands = [];
 
-        if (!this.validateCommand(command)) {
-            console.warn(`⚠️ Invalid command structure in ${file}`);
-            return 'failed';
+        for (const file of files) {
+            const fullPath = path.join(dir, file.name);
+            if (file.isDirectory()) {
+                const subCommands = await this.getCommandFiles(fullPath);
+                commands = [...commands, ...subCommands];
+            } else if (file.name.endsWith('.js')) {
+                commands.push(fullPath);
+            }
         }
 
-        this.commands.set(command.data.name, command);
-        console.log(`✅ Loaded command: ${command.data.name}`);
-        return 'loaded';
-    }
-
-    validateCommand(command) {
-        return command?.data?.name && 
-               command?.data?.description && 
-               typeof command?.execute === 'function';
+        return commands;
     }
 
     async registerCommands() {

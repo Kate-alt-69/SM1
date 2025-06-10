@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
+const { Client, GatewayIntentBits, ActivityType, Collection } = require('discord.js');
 const { TokenManager } = require('./utils/TokenManager');
 const { CommandManager } = require('./utils/CommandManager');
 const { keepAlive } = require('./KA.js');
@@ -19,9 +19,12 @@ class Bot extends Client {
 
         this.serverInfo = new Map();
         this.stickyMessages = new Map();
-        this.stickyCooldowns = new Map();
-        this.stickyLastSent = new Map();  // Changed to Map
-        this.guildStickyMessages = new Map(); // Changed to Map
+        this.stickyLastSent = new Map();
+        this.chatRateTracker = new Map(); // Track message rates per channel
+        this.stickyThresholds = new Map(); // Dynamic thresholds per channel
+
+        this.buttonHandlers = new Collection();
+        this.activeChannels = new Set(); // Track channels with sticky messages
     }
 
     async start() {
@@ -54,6 +57,10 @@ class Bot extends Client {
 
             await readyPromise;
 
+            // Load sticky data before registering commands
+            const stickyCommand = require('./commands/sticky/sticky.js');
+            await stickyCommand.loadData(this);
+            
             // Now load and register commands
             console.log('📝 Loading commands...');
             await this.commandManager.loadCommands();
@@ -113,8 +120,8 @@ class Bot extends Client {
             console.log(`   • Channel: #${interaction.channel.name}`);
             console.log('   • Status: Starting execution...');
             
-            // Defer longer commands
-            const longCommands = ['embed', 'help', 'about'];
+            // Defer longer commands, but not for modal commands
+            const longCommands = ['help', 'about'];  // Remove 'embed' from here
             if (longCommands.includes(interaction.commandName)) {
                 await interaction.deferReply();
                 console.log('   • Response: Deferred reply');
@@ -217,41 +224,169 @@ class Bot extends Client {
         }
     }
 
+    async handleInteraction(interaction) {
+        if (interaction.isButton()) {
+            const handler = this.buttonHandlers.get(interaction.customId);
+            if (handler) {
+                await handler(interaction);
+                return;
+            }
+        } else if (interaction.isModalSubmit()) {
+            const command = this.commandManager.commands.get('embed');
+            if (command && interaction.customId.startsWith('embed-')) {
+                await command.handleModalSubmit(interaction);
+                return;
+            }
+        }
+
+        if (interaction.isButton()) {
+            const command = this.commandManager.commands.get('embed');
+            if (command && interaction.customId.startsWith('edit_') || 
+                interaction.customId === 'confirm' || 
+                interaction.customId === 'add_file') {
+                await command.handleButton(interaction);
+                return;
+            }
+        }
+
+        this.handleCommand(interaction);
+    }
+
+    async updateStickyMessage(channelId, messageId, content) {
+        this.stickyMessages.set(channelId, {
+            messageId: messageId,
+            content: content,
+            lastSent: Date.now()
+        });
+        this.activeChannels.add(channelId); // Mark channel as active
+    }
+
+    async handleMessageCreate(message) {
+        // Ignore bot messages
+        if (message.author.bot) return;
+
+        // Only process channels that have sticky messages
+        if (!this.activeChannels.has(message.channel.id)) return;
+
+        // Process sticky message
+        await this.handleStickyMessage(message.channel);
+    }
+
     // Add sticky message handler
     async handleStickyMessage(channel) {
         const stickyData = this.stickyMessages.get(channel.id);
         if (!stickyData) return;
 
         try {
-            const messages = await channel.messages.fetch({ limit: 5 });
+            // Get dynamic cooldown based on chat rate
+            const lastSent = this.stickyLastSent.get(channel.id) || 0;
+            const dynamicCooldown = this.getCooldownTime(channel.id);
+            
+            if (Date.now() - lastSent < dynamicCooldown) {
+                return;
+            }
+
+            // Update chat rate tracking
+            this.updateChatRate(channel.id);
+
+            // Get dynamic threshold based on chat rate
+            const threshold = this.getMessageThreshold(channel.id);
+
+            // Fetch messages and check count
+            const messages = await channel.messages.fetch({ limit: 20 });
             const lastSticky = messages.find(m => m.author.id === this.user.id && m.id === stickyData.messageId);
             
-            // If no sticky found or 3+ messages after sticky
-            if (!lastSticky || messages.filter(m => m.createdTimestamp > lastSticky.createdTimestamp).size >= 3) {
-                // Delete old sticky if exists
-                if (lastSticky) await lastSticky.delete().catch(() => {});
-                
-                // Send new sticky
-                const newSticky = await channel.send(stickyData.content);
-                await this.updateStickyMessage(channel.id, newSticky.id, stickyData.content);
-                this.stickyLastSent.set(channel.id, Date.now());
+            if (!lastSticky) {
+                await this.sendNewSticky(channel, stickyData);
+                return;
+            }
+
+            // Count non-bot messages since last sticky
+            const messagesSinceSticky = messages
+                .filter(m => m.createdTimestamp > lastSticky.createdTimestamp && !m.author.bot)
+                .size;
+
+            // Only send if we hit the dynamic threshold
+            if (messagesSinceSticky >= threshold) {
+                console.log(`   • Found ${messagesSinceSticky} messages since last sticky (Threshold: ${threshold})`);
+                await lastSticky.delete().catch(() => console.log('   • Old sticky already deleted'));
+                await this.sendNewSticky(channel, stickyData);
             }
         } catch (error) {
-            console.error(`Error handling sticky message: ${error.message}`);
+            console.error(`   • Error handling sticky message: ${error.message}`);
         }
+    }
+
+    getCooldownTime(channelId) {
+        const rateData = this.chatRateTracker.get(channelId);
+        if (!rateData) return 3000; // Default 3 seconds
+
+        const messagesPerMinute = rateData.messages.length;
+        
+        // Adjust cooldown based on chat rate
+        if (messagesPerMinute > 20) { // Very active
+            return 7000; // 7 seconds for fast chat
+        } else if (messagesPerMinute > 10) { // Moderate
+            return 5000; // 5 seconds for medium chat
+        } else {
+            return 3000; // 3 seconds for slower chat
+        }
+    }
+
+    updateChatRate(channelId) {
+        const now = Date.now();
+        const rateData = this.chatRateTracker.get(channelId) || {
+            messages: [],
+            lastCalculation: now
+        };
+
+        // Add new message timestamp
+        rateData.messages.push(now);
+
+        // Remove messages older than 1 minute
+        rateData.messages = rateData.messages.filter(time => now - time <= 60000);
+
+        this.chatRateTracker.set(channelId, rateData);
+    }
+
+    getMessageThreshold(channelId) {
+        const rateData = this.chatRateTracker.get(channelId);
+        if (!rateData) return 3; // Default threshold
+
+        const messagesPerMinute = rateData.messages.length;
+        
+        // Adjust threshold based on chat rate
+        if (messagesPerMinute > 20) { // Very fast chat
+            return 10;
+        } else if (messagesPerMinute > 10) { // Medium speed chat
+            return 5;
+        } else {
+            return 3; // Normal/slow chat
+        }
+    }
+
+    async sendNewSticky(channel, stickyData) {
+        const newSticky = await channel.send(stickyData.content);
+        await this.updateStickyMessage(channel.id, newSticky.id, stickyData.content);
+        this.stickyLastSent.set(channel.id, Date.now());
+        console.log('   • Sent new sticky message');
     }
 }
 
 // Start bot
 (async () => {
     const bot = new Bot();
-    bot.on('interactionCreate', i => bot.handleCommand(i));
     
-    // Add message event handler for sticky messages
-    bot.on('messageCreate', async (message) => {
-        if (message.author.bot) return;
-        await bot.handleStickyMessage(message.channel);
+    bot.on('interactionCreate', async (interaction) => {
+        try {
+            await bot.handleInteraction(interaction);
+        } catch (error) {
+            console.error('Interaction error:', error);
+        }
     });
+    
+    // Update message event handler
+    bot.on('messageCreate', message => bot.handleMessageCreate(message));
 
     keepAlive();
     await bot.start();

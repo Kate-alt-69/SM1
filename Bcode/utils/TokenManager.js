@@ -27,7 +27,7 @@ class TokenManager {
             // Load from .env first (priority)
             const envToken = await this.loadFromEnv();
             if (envToken) {
-                console.log('✅ Successfully loaded token from .env');
+                console.log('✅ Successfully loaded token from .env [MODE : DEV]');
                 this.setTokenInfo(envToken, '.env');
                 return envToken;
             }

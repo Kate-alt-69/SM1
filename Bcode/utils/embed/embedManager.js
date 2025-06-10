@@ -1,6 +1,7 @@
 const { EmbedBuilder } = require('discord.js');
 const fs = require('fs').promises;
 const path = require('path');
+const { createEmbed } = require('./embedHelpers');
 
 class EmbedManager {
     constructor() {
@@ -53,6 +54,14 @@ class EmbedManager {
 
         return embed;
     }
+
+    async saveEmbed(guildId, embedId, embedData) {
+        if (!this.cache.has(guildId)) {
+            this.cache.set(guildId, new Map());
+        }
+        this.cache.get(guildId).set(embedId, embedData);
+        await this._saveToFile();
+    }
 }
 
-module.exports = EmbedManager;
+module.exports = { EmbedManager };
