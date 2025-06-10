@@ -7,34 +7,56 @@ const { keepAlive } = require('./KA.js');
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '.env') });
 
-// Fix token loading and validation
-async function loadToken() {
-    try {
-        const data = await fs.readFile(
-            path.join(__dirname, 'config', 'token.json'),
-            'utf8'
-        );
-        const tokenData = JSON.parse(data);
-        return tokenData.token;
-    } catch (err) {
-        console.error('Failed to load token:', err);
-        return null;
-    }
-}
-
 function validateToken(token) {
     if (!token) {
         console.error('❌ Error: No bot token found!');
-        console.log('Looking for token in config/token.json');
         return false;
     }
 
-    if (!token.match(/^[\w-]{24}\.[\w-]{6}\.[\w-]{27}$/)) {
-        console.error('❌ Error: Invalid token format!');
+    // More permissive regex pattern for token validation
+    if (!token.match(/[\w-]{24,26}\.[\w-]{6}\.[\w-]{27,38}/)) {
+        console.error('❌ Error: Invalid token format! Token should be in the format: XXXX.YYYY.ZZZZ');
         return false;
     }
 
+    console.log('✅ Token validation passed');
     return true;
+}
+
+async function loadToken() {
+    try {
+        // Detect and clear GitHub environment
+        if (process.env.GITHUB_ACTIONS || process.env.GITHUB_WORKSPACE) {
+            console.warn('⚠️ GitHub Actions environment detected - forcing local token load');
+            Object.keys(process.env).forEach(key => {
+                if (key.startsWith('GITHUB_') || key === 'TOKEN_SM') {
+                    delete process.env[key];
+                }
+            });
+        }
+
+        // Force local token load
+        let token = null;
+        try {
+            const tokenFile = await fs.readFile(path.join(__dirname, 'config', 'token.json'), 'utf8');
+            token = JSON.parse(tokenFile).token.trim();
+            console.log('✅ Using local token.json');
+        } catch (err) {
+            console.log('⚠️ Fallback to local .env');
+            dotenv.config({ path: path.join(__dirname, '.env'), override: true });
+            token = process.env.TOKEN_SM?.trim();
+        }
+
+        if (!token) {
+            throw new Error('No token found in local files');
+        }
+
+        console.log(`🔑 Using token: ${token.substring(0, 10)}...`);
+        return token;
+    } catch (err) {
+        console.error('❌ Failed to load token:', err);
+        return null;
+    }
 }
 
 class DataStorage {
@@ -90,7 +112,10 @@ class Bot extends Client {
                 GatewayIntentBits.Guilds,
                 GatewayIntentBits.GuildMessages,
                 GatewayIntentBits.MessageContent,
-                GatewayIntentBits.GuildMembers
+                GatewayIntentBits.GuildMembers,
+                GatewayIntentBits.GuildPresences,
+                GatewayIntentBits.GuildMessageReactions,
+                GatewayIntentBits.DirectMessages
             ]
         });
 
@@ -109,20 +134,39 @@ class Bot extends Client {
 
     async reloadBot() {
         try {
+            // Wait for application to be ready
+            if (!this.application) {
+                console.log('⌛ Waiting for application to be ready...');
+                await new Promise(resolve => setTimeout(resolve, 2000));
+            }
+
             if (!this.application?.commands) {
                 throw new Error("Application commands not ready");
             }
 
-            const guildCommands = this.commands.map(cmd => {
-                if (!cmd.data || !cmd.data.name || !cmd.data.description) {
-                    console.error(`❌ Invalid command data detected:`, cmd.data);
+            console.log('🔄 Starting command registration...');
+            
+            // Clear existing commands first
+            console.log('🧹 Clearing old commands...');
+            await this.application.commands.fetch()
+                .then(async commands => {
+                    for (const command of commands.values()) {
+                        await command.delete();
+                    }
+                });
+
+            const commandData = this.commands.map(cmd => {
+                if (!cmd.data?.name || !cmd.data.description) {
+                    console.error(`❌ Invalid command data:`, cmd.data);
                     throw new Error(`Invalid command data: ${JSON.stringify(cmd.data)}`);
                 }
-                return cmd.data;
+                return cmd.data.toJSON();
             });
 
-            await this.application.commands.set(guildCommands);
-            console.log(`✅ Successfully registered ${guildCommands.length} commands!`);
+            // Register new commands globally
+            await this.application.commands.set(commandData);
+            console.log(`✅ Registered ${commandData.length} commands globally`);
+
             return true;
         } catch (e) {
             console.error(`❌ Error syncing commands:`, e);
@@ -143,33 +187,37 @@ class Bot extends Client {
         this.commands.clear();
 
         try {
-            // Check if commands directory exists
-            try {
-                await fs.access(this.commandsPath);
-            } catch (e) {
-                await fs.mkdir(this.commandsPath, { recursive: true });
-                console.log('✅ Created commands directory');
-            }
-
-            // Load main commands with better error handling
+            // Add duplicate tracking
+            const duplicateTracker = new Map();
+            
             const commandFiles = await fs.readdir(this.commandsPath);
             for (const file of commandFiles) {
-                if (file.endsWith('.js')) {
-                    try {
-                        const filePath = path.join(this.commandsPath, file);
-                        delete require.cache[require.resolve(filePath)];
-                        const command = require(filePath);
-                        
-                        if (!command.data?.name || !command.execute) {
-                            console.warn(`⚠️ Command ${file} missing required properties`);
-                            continue;
-                        }
+                if (!file.endsWith('.js')) continue;
+                
+                try {
+                    const filePath = path.join(this.commandsPath, file);
+                    delete require.cache[require.resolve(filePath)];
+                    const command = require(filePath);
 
-                        this.commands.set(command.data.name, command);
-                        console.log(`✅ Loaded command: ${command.data.name}`);
-                    } catch (err) {
-                        console.error(`❌ Error loading command ${file}:`, err);
+                    if (!command.data?.name || !command.execute) {
+                        console.warn(`⚠️ Skipping invalid command file: ${file}`);
+                        continue;
                     }
+
+                    // Track duplicates
+                    const cmdName = command.data.name;
+                    if (duplicateTracker.has(cmdName)) {
+                        console.error(`❌ Duplicate command "${cmdName}" found in:`);
+                        console.error(`   - ${duplicateTracker.get(cmdName)}`);
+                        console.error(`   - ${file}`);
+                        continue;
+                    }
+
+                    duplicateTracker.set(cmdName, file);
+                    this.commands.set(cmdName, command);
+                    console.log(`✅ Loaded command: ${cmdName}`);
+                } catch (err) {
+                    console.error(`❌ Error loading command ${file}:`, err);
                 }
             }
         } catch (error) {
@@ -197,11 +245,21 @@ class Bot extends Client {
         });
     }
 
-    async start() {
+    async start(token) {
         try {
-            validateToken();
+            if (!validateToken(token)) {
+                throw new Error('Failed to validate token - check token format');
+            }
             await this.init();
-            await this.login(TOKEN);
+            await this.login(token);
+            
+            console.log(`✅ Logged in as: ${this.user.tag}`);
+            console.log(`🤖 Bot ID: ${this.user.id}`);
+            
+            // Add delay before registering commands
+            console.log('⌛ Waiting for bot to be ready...');
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
             await this.reloadBot();
             
             // Log info for the UI to parse
@@ -216,25 +274,42 @@ class Bot extends Client {
         }
     }
 
-    // Add proper interaction handling
+    // Update interaction handling with more logging
     async handleInteraction(interaction) {
-        if (!interaction.isCommand()) return;
+        if (!interaction.isChatInputCommand()) return;
+
+        console.log(`🎯 Received command: ${interaction.commandName}`);
+        console.log(`   From: ${interaction.user.tag}`);
+        console.log(`   Guild: ${interaction.guild?.name ?? 'DM'}`);
 
         const command = this.commands.get(interaction.commandName);
-        if (!command) return;
+        if (!command) {
+            console.error(`❌ Command not found: ${interaction.commandName}`);
+            await interaction.reply({ 
+                content: 'Command not found or not loaded properly.',
+                ephemeral: true 
+            });
+            return;
+        }
 
         try {
+            console.log(`🔨 Executing command: ${interaction.commandName}`);
             await command.execute(interaction);
+            console.log(`✅ Command completed: ${interaction.commandName}`);
         } catch (error) {
-            console.error(error);
+            console.error(`❌ Command execution error for ${interaction.commandName}:`, error);
             const errorMessage = { 
-                content: 'Error executing command!', 
+                content: 'Error executing command! The error has been logged.',
                 ephemeral: true 
             };
-            if (interaction.replied || interaction.deferred) {
-                await interaction.followUp(errorMessage);
-            } else {
-                await interaction.reply(errorMessage);
+            try {
+                if (interaction.replied || interaction.deferred) {
+                    await interaction.followUp(errorMessage);
+                } else {
+                    await interaction.reply(errorMessage);
+                }
+            } catch (e) {
+                console.error('Failed to send error message:', e);
             }
         }
     }
@@ -322,12 +397,20 @@ process.on('uncaughtException', error => {
 // Initialize bot
 (async () => {
     try {
+        // Clear any existing bot instances
+        if (global.bot) {
+            await global.bot.destroy();
+            delete global.bot;
+        }
+        
         const token = await loadToken();
-        if (!validateToken(token)) {
-            throw new Error('Invalid or missing token');
+        if (!token) {
+            throw new Error('Failed to load token');
         }
 
         const bot = new Bot();
+        global.bot = bot; // Store bot instance globally
+        
         keepAlive();
         console.log("✅ Web server started!");
         console.log("✅ Starting bot with data persistence...");
