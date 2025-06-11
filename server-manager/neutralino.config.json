@@ -1,0 +1,30 @@
+{
+    "applicationId": "com.servermanager.app",
+    "version": "1.0.0",
+    "defaultMode": "window",
+    "port": 0,
+    "documentRoot": "/resources",
+    "url": "/",
+    "enableServer": true,
+    "enableNativeAPI": true,
+    "tokenSecurity": "one-time",
+    "cli": {
+        "binaryName": "ServerManager",
+        "resourcesPath": "/resources/",
+        "extensionsPath": "/extensions/",
+        "binaryVersion": "4.14.1",
+        "clientVersion": "3.12.0",
+        "clientLibrary": "/resources/js/neutralino.js"
+    },
+    "modes": {
+        "window": {
+            "title": "Server Manager",
+            "width": 1200,
+            "height": 800,
+            "minWidth": 800,
+            "minHeight": 600,
+            "center": true,
+            "enableInspector": true
+        }
+    }
+}

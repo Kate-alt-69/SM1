@@ -2,6 +2,7 @@ const { Client, GatewayIntentBits, ActivityType, Collection } = require('discord
 const { TokenManager } = require('./utils/TokenManager');
 const { CommandManager } = require('./utils/CommandManager');
 const { keepAlive } = require('./KA.js');
+const { ConnectionManager } = require('./utils/ConnectionManager');
 
 class Bot extends Client {
     constructor() {
@@ -25,16 +26,25 @@ class Bot extends Client {
 
         this.buttonHandlers = new Collection();
         this.activeChannels = new Set(); // Track channels with sticky messages
+
+        this.connectionCheckInterval = null;
     }
 
     async start() {
         try {
             console.log('🔄 Starting bot initialization...');
             
-            const token = await this.tokenManager.loadToken();
+            // Load token based on mode
+            const token = await this.tokenManager.loadToken(devMode);
             if (!token) {
-                throw new Error('No valid token found - Check token.json or .env');
+                throw new Error('No valid token found');
             }
+
+            // Check internet before starting
+            await ConnectionManager.waitForInternet();
+            
+            // Start connection monitoring
+            this.startConnectionMonitoring();
 
             // Add environment check
             console.log('🔍 Current working directory:', process.cwd());
@@ -83,9 +93,24 @@ class Bot extends Client {
             console.log('✅ Bot initialization complete!');
         } catch (error) {
             console.error('❌ Fatal startup error:', error.message);
-            if (error.stack) console.error(error.stack);
             process.exit(1);
         }
+    }
+
+    startConnectionMonitoring() {
+        // Check connection every 30 seconds
+        this.connectionCheckInterval = setInterval(async () => {
+            const hasConnection = await ConnectionManager.checkInternet();
+            if (!hasConnection) {
+                console.log('\n⚠️ Internet connection lost!');
+                await ConnectionManager.waitForInternet();
+                // Reconnect bot if needed
+                if (!this.isReady()) {
+                    console.log('🔄 Reconnecting bot...');
+                    await this.login(this.token);
+                }
+            }
+        }, 30000);
     }
 
     async handleCommand(interaction) {
@@ -370,6 +395,14 @@ class Bot extends Client {
         await this.updateStickyMessage(channel.id, newSticky.id, stickyData.content);
         this.stickyLastSent.set(channel.id, Date.now());
         console.log('   • Sent new sticky message');
+    }
+
+    // Clean up on shutdown
+    async destroy() {
+        if (this.connectionCheckInterval) {
+            clearInterval(this.connectionCheckInterval);
+        }
+        await super.destroy();
     }
 }
 

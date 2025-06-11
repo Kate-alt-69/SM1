@@ -1,0 +1,7 @@
+{
+    "description": "Server Manager DevTools",
+    "devtools_page": "devtools.html",
+    "manifest_version": 2,
+    "name": "Server Manager DevTools",
+    "version": "1.0"
+}

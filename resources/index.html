@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Server Manager</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="js/services/CommandScanner.js"></script>
+    <script src="js/services/TokenService.js"></script>
+    <script src="js/neutralino.js"></script>
+    <script src="js/main.js"></script>
+</head>
+<body>
+    <div class="titlebar">
+        <div class="bot-profile">
+            <img id="botAvatar" src="assets/default-avatar.png" alt="Bot Avatar">
+            <div class="bot-info">
+                <span id="botName">Not Connected</span>
+                <span id="botId" class="bot-id">ID: --</span>
+            </div>
+        </div>
+        <div class="window-controls">
+            <button class="icon-button settings-btn" onclick="toggleSettings()">
+                <img src="assets/settings-btn.png" alt="Settings">
+            </button>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="status-section">
+            <div class="status-card">
+                <div class="status-indicator">
+                    <span id="statusDot" class="status-dot offline"></span>
+                    <span id="statusText">Offline</span>
+                </div>
+                <div class="version">v1.0.0</div>
+            </div>
+            <div class="uptime-display">
+                <span class="label">Uptime</span>
+                <span id="uptime">0:00:00</span>
+            </div>
+        </div>
+
+        <div class="control-section">
+            <button id="startBot" class="action-button primary ripple">
+                <span class="button-content">
+                    <i class="icon">▶</i>
+                    <span>Start Bot</span>
+                </span>
+            </button>
+            <button id="stopBot" class="action-button danger ripple" disabled>
+                <span class="button-content">
+                    <i class="icon">⬛</i>
+                    <span>Stop Bot</span>
+                </span>
+            </button>
+        </div>
+    </div>
+</body>
+</html>
