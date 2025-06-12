@@ -6,6 +6,21 @@ class CommandScanner {
 
     async scanCommands() {
         try {
+            // Verify commands directory exists
+            try {
+                await Neutralino.filesystem.getStats(this.commandsPath);
+            } catch {
+                // Create directory if it doesn't exist
+                try {
+                    await Neutralino.filesystem.createDirectory('Bcode');
+                    await Neutralino.filesystem.createDirectory(this.commandsPath);
+                    return []; // Return empty array for fresh install
+                } catch (err) {
+                    console.error('Failed to create commands directory:', err);
+                    return [];
+                }
+            }
+
             const files = await Neutralino.filesystem.readDirectory(this.commandsPath);
             const commands = [];
 

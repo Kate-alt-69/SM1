@@ -4,50 +4,30 @@
     "defaultMode": "window",
     "port": 0,
     "documentRoot": "/resources",
-    "url": "/",
-    "enableServer": true,
+    "url": "/index.html",
+    "enableServer": false,
     "enableNativeAPI": true,
     "tokenSecurity": "one-time",
-    "cli": {
-        "binaryName": "ServerManager",
-        "resourcesPath": "/resources/",
-        "extensionsPath": "/extensions/",
-        "clientLibrary": "/resources/js/neutralino.js",
-        "binaryVersion": "4.14.1",
-        "clientVersion": "3.12.0",
-        "frontendLibrary": {
-            "patchFile": "/resources/index.html",
-            "devUrl": "http://localhost:5173"
-        },
-        "includeFiles": [
-            "favicon.ico",
-            ".well-known/**/*"
-        ]
+    "logging": {
+        "enabled": true,
+        "writeToLogFile": true
     },
     "modes": {
         "window": {
             "title": "Server Manager",
-            "width": 1200,
-            "height": 800,
+            "width": 800,
+            "height": 600,
             "minWidth": 800,
             "minHeight": 600,
-            "fullScreen": false,
-            "alwaysOnTop": false,
+            "center": true,
             "icon": "/resources/icons/server-manager.ico",
-            "enableTrayIcon": true,
-            "trayIcon": {
-                "file": "/resources/icons/server-manager.ico",
-                "tooltip": "Server Manager"
-            },
-            "enableInspector": true,
-            "borderless": false,
-            "maximize": false,
-            "hidden": false,
-            "resizable": true,
-            "exitProcessOnClose": true
+            "enableInspector": false
         }
     },
-    "globalVariables": {
-        "TEST": "Test value"
+    "cli": {
+        "binaryName": "ServerManager",
+        "resourcesPath": "/resources/",
+        "extensionsPath": "/extensions/",
+        "clientLibrary": "/resources/js/neutralino.js"
     }
 }

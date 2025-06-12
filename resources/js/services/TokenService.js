@@ -52,10 +52,12 @@ class TokenService {
             const tokenFile = await Neutralino.filesystem.readFile(this.tokenPath);
             const { token } = JSON.parse(tokenFile);
             if (!await this.validateToken(token)) {
-                throw new Error('Invalid token found');
+                console.log('Invalid token format found');
+                return null;
             }
             return token;
         } catch {
+            // Just return null without throwing an error
             return null;
         }
     }
