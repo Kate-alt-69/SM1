@@ -1,3 +1,7 @@
 {
-    "bots": []
+  "stickyMessages": {},
+  "stickyCooldowns": {},
+  "guildStickyMessages": {},
+  "serverInfo": {},
+  "storedEmbeds": {}
 }

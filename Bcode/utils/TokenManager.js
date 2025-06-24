@@ -9,6 +9,7 @@ class TokenManager {
         this.botDataPath = path.join(__dirname, '../config/bot_data.json');
         this.tokenSource = null;
         this.maskedToken = null;
+        this.isDev = false;
         
         // Add debug logging
         console.log('📝 TokenManager initialized with paths:');
@@ -16,60 +17,52 @@ class TokenManager {
         console.log(`   Env: ${this.envPath}`);
     }
 
-    async loadToken(devMode = false, token = null) {
-        if (devMode) {
-            try {
-                require('dotenv').config();
-                return process.env.BOT_TOKEN;
-            } catch (err) {
-                console.error('Failed to load dev token:', err);
-                return null;
-            }
-        }
-
+    async loadToken() {
         try {
-            console.log('🔄 Starting token load sequence');
+            console.log('\n🔄 Starting token load sequence');
             console.log('🔍 Checking token sources...');
 
-            // Clear any cached tokens
-            delete process.env.TOKEN_SM;
-            delete require.cache[this.configPath];
+            const envConfig = dotenv.config({ path: this.envPath });
+            const isDevMode = envConfig.parsed?.MODE === 'DEV';
+            
+            if (isDevMode) {
+                console.log('🔧 Development mode detected');
+                const envToken = envConfig.parsed?.TOKEN;
 
-            if (token) {
-                console.log('✅ Using provided token directly');
-                this.setTokenInfo(token, 'Provided Token');
-                return token;
-            }
+                if (!envToken || envToken === 'your-bot-token-here') {
+                    console.error('\n❌ Development Mode Error:');
+                    console.error('The default token value was found in .env file');
+                    console.error('\n📝 Please add your bot token:');
+                    console.error('1. Open Bcode/.env file');
+                    console.error('2. Replace "your-bot-token-here" with your actual bot token');
+                    console.error('3. Keep MODE=DEV enabled\n');
+                    throw new Error('Invalid token in DEV mode - using default value');
+                }
 
-            // Load from .env first (priority)
-            const envToken = await this.loadFromEnv();
-            if (envToken) {
-                console.log('✅ Successfully loaded token from .env [MODE : DEV]');
-                this.setTokenInfo(envToken, '.env');
+                console.log('✅ Successfully loaded token from .env [DEV MODE]');
+                this.setTokenInfo(envToken, '.env [DEV MODE]');
+                this.isDev = true;
                 return envToken;
             }
 
-            // Fallback to token.json
+            // Not in dev mode - load from token.json
             const jsonToken = await this.loadFromJson();
             if (jsonToken) {
-                console.log('✅ Successfully loaded token from token.json');
                 this.setTokenInfo(jsonToken, 'token.json');
                 return jsonToken;
             }
 
-            // As a last resort, load from bot_data.json
-            const botDataToken = await this.loadBotData();
-            if (botDataToken) {
-                console.log('✅ Successfully loaded token from bot_data.json');
-                this.setTokenInfo(botDataToken, 'bot_data.json');
-                return botDataToken;
-            }
-
-            throw new Error('No valid token found in any source');
+            throw new Error('No valid token found');
         } catch (err) {
-            console.error('❌ Token loading failed:', err.message);
+            console.error(`\n❌ Token loading failed: ${err.message}`);
             return null;
         }
+    }
+
+    isValidTokenFormat(token) {
+        // Basic Discord token format validation
+        const tokenRegex = /^[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}$/;
+        return tokenRegex.test(token);
     }
 
     setTokenInfo(token, source) {
@@ -81,9 +74,25 @@ class TokenManager {
     }
 
     getTokenInfo() {
+        const stats = this.client?.botStats || {
+            commands: 0,
+            mainCommands: 0,
+            subCommands: 0
+        };
+
         return {
             source: this.tokenSource || 'Unknown',
-            maskedToken: this.maskedToken || 'Not Available'
+            maskedToken: this.maskedToken || 'Not Available',
+            displayString: `===========================================
+              BOT STATUS                   
+===========================================
+📊 Servers In     : ${this.client?.guilds.cache.size || 0}
+🤖 Logged in As   : ${this.client?.user?.tag || 'Unknown'}
+🆔 Bot ID         : ${this.client?.user?.id || 'Unknown'}
+🔑 Logged in with : ${this.maskedToken} [${this.tokenSource}]
+📁 Loaded CF      : ${stats.mainCommands || 0}
+🎮 Commands Total : ${stats.commands || 0} (${stats.mainCommands} main, ${stats.subCommands} sub)
+===========================================`
         };
     }
 

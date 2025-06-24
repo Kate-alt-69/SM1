@@ -1,26 +1,17 @@
 {
   "name": "server-manager",
   "version": "1.0.0",
-  "description": "A Discord bot for server management",
-  "main": "Bcode/DCB.js",
-  "private": true,
+  "description": "Discord Server Management Application",
+  "main": "index.js",
   "scripts": {
     "start": "neu run",
     "build": "neu build",
-    "dev": "neu run --frontend-lib-dev",
-    "update": "neu update",
-    "reload": "cross-env FORCE_TOKEN_RELOAD=true node Bcode/DCB.js",
-    "broadcast": "node Bcode/scripts/broadcast.js"
+    "dev": "neu run --frontend-lib-dev"
   },
   "dependencies": {
-    "discord.js": "^14.14.1",
-    "dotenv": "^16.3.1",
-    "express": "^5.1.0",
-    "node-fetch": "^2.6.7",
-    "xterm": "^5.3.0",
-    "@neutralinojs/neu": "^9.6.0"
+    "@neutralinojs/neu": "^9.8.0",
+    "xterm": "^5.3.0"
   },
-  "devDependencies": {
-    "cross-env": "^7.0.3"
-  }
+  "author": "",
+  "license": "MIT"
 }

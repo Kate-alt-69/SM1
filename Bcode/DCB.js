@@ -3,6 +3,10 @@ const { TokenManager } = require('./utils/TokenManager');
 const { CommandManager } = require('./utils/CommandManager');
 const { keepAlive } = require('./KA.js');
 const { ConnectionManager } = require('./utils/ConnectionManager');
+const DevScripts = require('./utils/devScripts');
+const { devCheck } = require('./scripts/dev');
+const { EmojiCache } = require('./utils/EmojiCache');
+const { BotDataManager } = require('./utils/BotDataManager');
 
 class Bot extends Client {
     constructor() {
@@ -28,71 +32,75 @@ class Bot extends Client {
         this.activeChannels = new Set(); // Track channels with sticky messages
 
         this.connectionCheckInterval = null;
+
+        this.devMode = false;
+
+        // Initialize bot stats
+        this.botStats = {
+            commands: 0,
+            mainCommands: 0,
+            subCommands: 0
+        };
+
+        this.emojiCache = null;
+        this.dataManager = null;
     }
 
     async start() {
         try {
             console.log('🔄 Starting bot initialization...');
-            
-            // Load token based on mode
-            const token = await this.tokenManager.loadToken(devMode);
+
+            // Add startup timeout
+            const startupTimeout = setTimeout(() => {
+                throw new Error('Bot startup timed out after 60 seconds');
+            }, 60000);
+
+            // Get token
+            const token = await this.tokenManager.loadToken();
             if (!token) {
-                throw new Error('No valid token found');
+                throw new Error('Failed to load token');
             }
 
-            // Check internet before starting
-            await ConnectionManager.waitForInternet();
-            
-            // Start connection monitoring
-            this.startConnectionMonitoring();
+            // Single ready event with all initialization
+            await new Promise((resolve, reject) => {
+                this.once('ready', async () => {
+                    try {
+                        clearTimeout(startupTimeout);
 
-            // Add environment check
-            console.log('🔍 Current working directory:', process.cwd());
-            
-            // Login first
-            await this.login(token);
-            console.log(`✅ Logged in as: ${this.user.tag}`);
+                        // 1. Initialize emoji cache
+                        this.emojiCache = new EmojiCache(this);
+                        await this.emojiCache.loadEmojis();
 
-            // Set up ready event handler before login
-            const readyPromise = new Promise((resolve, reject) => {
-                this.once('ready', () => {
-                    console.log('✅ Bot is ready!');
-                    resolve();
+                        // 2. Initialize commands
+                        await this.commandManager.loadCommands();
+
+                        // 3. Initialize data manager
+                        this.dataManager = new BotDataManager(this);
+                        await this.dataManager.initialize();
+
+                        // 4. Display final status
+                        console.log('\n===========================================');
+                        console.log('              BOT STATUS                   ');
+                        console.log('===========================================');
+                        console.log(`📊 Servers In     : ${this.guilds.cache.size}`);
+                        console.log(`🤖 Logged in As   : ${this.user.tag}`);
+                        console.log(`🆔 Bot ID         : ${this.user.id}`);
+                        console.log(`🔑 Logged in with : ${this.tokenManager.getTokenInfo().maskedToken} [${this.tokenManager.getTokenInfo().source}]`);
+                        console.log(`📁 Loaded CF      : ${this.commandManager.stats.mainCommands}`);
+                        console.log(`🎮 Commands Total : ${this.commandManager.stats.totalCommands} (${this.commandManager.stats.mainCommands} main, ${this.commandManager.stats.subCommands} sub)`);
+                        console.log('===========================================\n');
+
+                        resolve();
+                    } catch (error) {
+                        reject(error);
+                    }
                 });
 
-                setTimeout(() => {
-                    reject(new Error('Bot startup timed out after 60 seconds'));
-                }, 60000);
+                this.login(token).catch(reject);
             });
 
-            await readyPromise;
-
-            // Load sticky data before registering commands
-            const stickyCommand = require('./commands/sticky/sticky.js');
-            await stickyCommand.loadData(this);
-            
-            // Now load and register commands
-            console.log('📝 Loading commands...');
-            await this.commandManager.loadCommands();
-            await this.commandManager.registerCommands();
-
-            // Set activity after everything is ready
-            this.user.setActivity('/help | Server Manager', { type: ActivityType.Playing });
-
-            // Display final status
-            const tokenInfo = this.tokenManager.getTokenInfo();
-            console.log('\n===========================================');
-            console.log('              BOT STATUS                   ');
-            console.log('===========================================');
-            console.log(`📊 Servers In     : ${this.guilds.cache.size}`);
-            console.log(`🤖 Logged in As   : ${this.user.tag}`);
-            console.log(`🆔 Bot ID         : ${this.user.id}`);
-            console.log(`🔑 Logged in with : ${tokenInfo.maskedToken} [${tokenInfo.source}]`);
-            console.log('===========================================\n');
-
-            console.log('✅ Bot initialization complete!');
         } catch (error) {
-            console.error('❌ Fatal startup error:', error.message);
+            console.error('❌ Startup error:', error);
             process.exit(1);
         }
     }

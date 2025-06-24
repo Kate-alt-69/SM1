@@ -6,146 +6,196 @@ const {
     ModalBuilder,
     TextInputBuilder,
     TextInputStyle,
-    EmbedBuilder 
+    EmbedBuilder,
+    Colors 
 } = require('discord.js');
 const fs = require('fs').promises;
 const path = require('path');
+const { validateHexColor, hexToDecimal } = require('../../utils/embedHelpers');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('embed')
         .setDescription('Create and manage embeds')
-        .addSubcommandGroup(group =>
-            group.setName('create')
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('create')
                 .setDescription('Create a new embed')
-                .addSubcommand(subcommand =>
-                    subcommand.setName('new')
-                        .setDescription('Create a new embed from scratch')
-                )
-        ),
+                .addStringOption(option =>
+                    option.setName('name')
+                        .setDescription('Name/ID for the embed')
+                        .setRequired(true))),
+
+    embedCache: new Map(), // Store embed data during editing
 
     async execute(interaction) {
-        if (interaction.options.getSubcommandGroup() === 'create') {
-            // Stage 1: Ask for embed name
-            const modal = new ModalBuilder()
-                .setCustomId('embed-name-input')
-                .setTitle('Name Your Embed');
-
-            const nameInput = new TextInputBuilder()
-                .setCustomId('embedName')
-                .setLabel('Give your embed a name (for saving)')
-                .setStyle(TextInputStyle.Short)
-                .setRequired(true);
-
-            modal.addComponents(new ActionRowBuilder().addComponents(nameInput));
-            await interaction.showModal(modal);
-        }
-    },
-
-    async handleModalSubmit(interaction) {
-        if (interaction.customId === 'embed-name-input') {
-            const embedName = interaction.fields.getTextInputValue('embedName');
+        if (interaction.options.getSubcommand() === 'create') {
+            const embedName = interaction.options.getString('name');
             
-            // Stage 2: Show embed preview with edit buttons
-            const embed = new EmbedBuilder()
-                .setTitle('New Embed')
-                .setDescription('Use the buttons below to customize your embed')
-                .setColor(0x0099ff);
+            // Initialize embed state
+            const embedData = {
+                name: embedName,
+                color: Colors.Blue, // Default color
+                colorHistory: [Colors.Blue],
+                content: {
+                    title: 'New Embed',
+                    description: 'Use the buttons below to customize this embed'
+                }
+            };
 
-            const row1 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('edit_title')
-                    .setLabel('Set Title')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId('edit_description')
-                    .setLabel('Set Description')
-                    .setStyle(ButtonStyle.Primary),
-                new ButtonBuilder()
-                    .setCustomId('edit_color')
-                    .setLabel('Set Color')
-                    .setStyle(ButtonStyle.Secondary)
-            );
+            // Save initial state
+            this.embedCache.set(interaction.user.id, embedData);
 
-            const row2 = new ActionRowBuilder().addComponents(
-                new ButtonBuilder()
-                    .setCustomId('edit_footer')
-                    .setLabel('Add Footer')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId('edit_image')
-                    .setLabel('Add Image')
-                    .setStyle(ButtonStyle.Secondary),
-                new ButtonBuilder()
-                    .setCustomId('preview_send')
-                    .setLabel('Preview & Send')
-                    .setStyle(ButtonStyle.Success)
-            );
+            // Create initial embed
+            const embed = this.createEmbed(embedData);
+            const components = this.createEditorButtons();
 
             await interaction.reply({
                 content: `Creating embed: ${embedName}`,
                 embeds: [embed],
-                components: [row1, row2],
+                components: components,
                 ephemeral: true
             });
-
-            // Store temporary embed data
-            interaction.client.embedCache = interaction.client.embedCache || new Map();
-            interaction.client.embedCache.set(interaction.user.id, {
-                name: embedName,
-                embed: embed.toJSON(),
-                stage: 'editing'
-            });
         }
+    },
+
+    createEmbed(data) {
+        return new EmbedBuilder()
+            .setTitle(data.content.title)
+            .setDescription(data.content.description)
+            .setColor(data.color);
+    },
+
+    createEditorButtons() {
+        const row1 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('edit_title')
+                .setLabel('Title')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('edit_description')
+                .setLabel('Description')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('edit_color')
+                .setLabel('Color')
+                .setStyle(ButtonStyle.Secondary)
+        );
+
+        const row2 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('save_embed')
+                .setLabel('Save')
+                .setStyle(ButtonStyle.Success),
+            new ButtonBuilder()
+                .setCustomId('cancel_embed')
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Danger)
+        );
+
+        return [row1, row2];
     },
 
     async handleButton(interaction) {
-        const action = interaction.customId;
-        const userData = interaction.client.embedCache?.get(interaction.user.id);
-
+        const userData = this.embedCache.get(interaction.user.id);
         if (!userData) return;
 
-        switch(action) {
-            case 'edit_title':
-            case 'edit_description':
+        switch (interaction.customId) {
             case 'edit_color':
-            case 'edit_footer':
-            case 'edit_image':
-                await this.showEditModal(interaction, action.split('_')[1]);
+                await this.showColorEditor(interaction, userData);
                 break;
-            
-            case 'preview_send':
-                await this.showPreviewButtons(interaction);
+            case 'edit_description':
+                await this.showDescriptionModal(interaction, userData);
                 break;
+            // ... other button handlers
         }
     },
 
-    async saveEmbed(interaction, embedData) {
-        const filePath = path.join(__dirname, 'embeds.json');
-        try {
-            let data = { embeds: { serverEmbeds: {} } };
-            try {
-                data = JSON.parse(await fs.readFile(filePath, 'utf8'));
-            } catch (err) {
-                if (err.code !== 'ENOENT') throw err;
-            }
+    async showColorEditor(interaction, userData) {
+        // Create color picker with presets and HEX input
+        const row1 = new ActionRowBuilder().addComponents(
+            new ButtonBuilder()
+                .setCustomId('color_hex')
+                .setLabel('Custom HEX')
+                .setStyle(ButtonStyle.Primary),
+            new ButtonBuilder()
+                .setCustomId('color_cancel')
+                .setLabel('Cancel')
+                .setStyle(ButtonStyle.Secondary)
+        );
 
-            if (!data.embeds.serverEmbeds[interaction.guildId]) {
-                data.embeds.serverEmbeds[interaction.guildId] = { embeds: {} };
-            }
+        // Add preset colors
+        const presetRows = Object.entries(Colors).slice(0, 8).map(([name, value]) => {
+            return new ButtonBuilder()
+                .setCustomId(`color_preset_${value}`)
+                .setLabel(name)
+                .setStyle(ButtonStyle.Secondary);
+        });
 
-            data.embeds.serverEmbeds[interaction.guildId].embeds[embedData.name] = {
-                ...embedData.embed,
-                createdBy: interaction.user.id,
-                createdAt: new Date().toISOString(),
-                lastModified: new Date().toISOString()
-            };
+        const row2 = new ActionRowBuilder().addComponents(presetRows.slice(0, 4));
+        const row3 = new ActionRowBuilder().addComponents(presetRows.slice(4));
 
-            await fs.writeFile(filePath, JSON.stringify(data, null, 2));
-            return true;
-        } catch (err) {
-            console.error('Error saving embed:', err);
-            return false;
+        await interaction.reply({
+            content: 'Choose a color or enter a custom HEX code:',
+            components: [row1, row2, row3],
+            ephemeral: true
+        });
+    },
+
+    async handleColorButton(interaction) {
+        const userData = this.embedCache.get(interaction.user.id);
+        if (!userData) return;
+
+        const action = interaction.customId;
+
+        if (action === 'color_hex') {
+            const modal = new ModalBuilder()
+                .setCustomId('color_hex_input')
+                .setTitle('Enter HEX Color');
+
+            const hexInput = new TextInputBuilder()
+                .setCustomId('hex_value')
+                .setLabel('HEX Color (e.g. #FF0000)')
+                .setStyle(TextInputStyle.Short)
+                .setRequired(true);
+
+            modal.addComponents(new ActionRowBuilder().addComponents(hexInput));
+            await interaction.showModal(modal);
+        } else if (action === 'color_cancel') {
+            // Revert to previous color
+            userData.color = userData.colorHistory[userData.colorHistory.length - 2] || userData.color;
+            await this.updateEmbed(interaction, userData);
+        } else if (action.startsWith('color_preset_')) {
+            const color = parseInt(action.split('_')[2]);
+            userData.colorHistory.push(userData.color);
+            userData.color = color;
+            await this.updateEmbed(interaction, userData);
         }
+    },
+
+    async handleHexInput(interaction) {
+        const userData = this.embedCache.get(interaction.user.id);
+        if (!userData) return;
+
+        const hex = interaction.fields.getTextInputValue('hex_value');
+        if (validateHexColor(hex)) {
+            userData.colorHistory.push(userData.color);
+            userData.color = hexToDecimal(hex);
+            await this.updateEmbed(interaction, userData);
+        } else {
+            await interaction.reply({
+                content: 'Invalid HEX color! Please use format: #RRGGBB',
+                ephemeral: true
+            });
+        }
+    },
+
+    async updateEmbed(interaction, userData) {
+        const embed = this.createEmbed(userData);
+        await interaction.message.edit({
+            embeds: [embed],
+            components: this.createEditorButtons()
+        });
+        await interaction.deferUpdate();
     }
 };

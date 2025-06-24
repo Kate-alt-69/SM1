@@ -4,8 +4,6 @@ const path = require('path');
 const fs = require('fs').promises;
 const { spawn } = require('child_process');
 const clipboard = require('electron').clipboard;
-const { Terminal } = require('xterm');
-require('xterm/css/xterm.css');
 
 const autoLauncher = new AutoLaunch({
     name: 'Server Manager Bot',
@@ -21,10 +19,6 @@ let botInfo = {
     guilds: 0,
     registeredCommands: 0
 };
-
-let terminal;
-const commandHistory = [];
-let historyIndex = -1;
 
 async function saveToken(token) {
     try {
@@ -190,33 +184,6 @@ function createWindow() {
                     text-align: center;
                     font-size: 14px;
                 }
-
-                .terminal-container {
-                    background: #2f3136;
-                    border-radius: 8px;
-                    padding: 8px;
-                    margin-top: 16px;
-                    height: 300px;
-                    overflow: hidden;
-                }
-
-                .terminal {
-                    width: 100%;
-                    height: 100%;
-                    font-family: 'Fira Code', monospace;
-                }
-
-                .split-view {
-                    display: flex;
-                    gap: 16px;
-                    height: calc(100vh - 32px);
-                }
-
-                .panel {
-                    flex: 1;
-                    overflow: auto;
-                    padding: 16px;
-                }
             </style>
         </head>
         <body>
@@ -237,42 +204,32 @@ function createWindow() {
                 </div>
             </div>
             
-            <div class="split-view">
-                <div class="panel">
-                    <div class="content">
-                        <div class="card">
-                            <h2>Bot Configuration</h2>
-                            <div class="input-group">
-                                <label for="token">Bot Token</label>
-                                <input type="password" id="token" placeholder="Enter your Discord bot token">
-                            </div>
-                            <button onclick="startBot()">Start Bot</button>
-                            <button onclick="stopBot()" style="background: #ed4245;">Stop Bot</button>
-                        </div>
-
-                        <div class="card">
-                            <h2>Statistics</h2>
-                            <div class="stats">
-                                <div class="stat-card">
-                                    <h3>Status</h3>
-                                    <p id="status">Stopped</p>
-                                </div>
-                                <div class="stat-card">
-                                    <h3>Uptime</h3>
-                                    <p id="uptime">0h 0m 0s</p>
-                                </div>
-                                <div class="stat-card">
-                                    <h3>Commands</h3>
-                                    <p id="commands">0</p>
-                                </div>
-                            </div>
-                        </div>
+            <div class="content">
+                <div class="card">
+                    <h2>Bot Configuration</h2>
+                    <div class="input-group">
+                        <label for="token">Bot Token</label>
+                        <input type="password" id="token" placeholder="Enter your Discord bot token">
                     </div>
+                    <button onclick="startBot()">Start Bot</button>
+                    <button onclick="stopBot()" style="background: #ed4245;">Stop Bot</button>
                 </div>
-                <div class="panel">
-                    <div class="card">
-                        <h2>Bot Console</h2>
-                        <div class="terminal-container" id="terminal"></div>
+
+                <div class="card">
+                    <h2>Statistics</h2>
+                    <div class="stats">
+                        <div class="stat-card">
+                            <h3>Status</h3>
+                            <p id="status">Stopped</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Uptime</h3>
+                            <p id="uptime">0h 0m 0s</p>
+                        </div>
+                        <div class="stat-card">
+                            <h3>Commands</h3>
+                            <p id="commands">0</p>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -327,47 +284,6 @@ function createWindow() {
                 ipcRenderer.on('update-title', (event, info) => {
                     document.getElementById('botInfo').textContent = \`\${info.commands} Commands | \${info.guilds} Servers\`;
                 });
-
-                // Terminal initialization
-                const term = new Terminal({
-                    theme: {
-                        background: '#2f3136',
-                        foreground: '#ffffff',
-                        cursor: '#ffffff'
-                    },
-                    fontSize: 14,
-                    fontFamily: 'Fira Code, monospace',
-                    cursorBlink: true
-                });
-
-                term.open(document.getElementById('terminal'));
-                term.write('Server Manager Bot CLI\r\n$ ');
-
-                let currentCommand = '';
-                term.onKey(({ key, domEvent }) => {
-                    const printable = !domEvent.altKey && !domEvent.ctrlKey && !domEvent.metaKey;
-
-                    if (domEvent.keyCode === 13) { // Enter
-                        term.write('\r\n');
-                        if (currentCommand) {
-                            ipcRenderer.send('cli-command', currentCommand);
-                        }
-                        currentCommand = '';
-                        term.write('$ ');
-                    } else if (domEvent.keyCode === 8) { // Backspace
-                        if (currentCommand.length > 0) {
-                            currentCommand = currentCommand.slice(0, -1);
-                            term.write('\b \b');
-                        }
-                    } else if (printable) {
-                        currentCommand += key;
-                        term.write(key);
-                    }
-                });
-
-                ipcRenderer.on('terminal-output', (event, data) => {
-                    term.writeln(data);
-                });
             </script>
         </body>
         </html>
@@ -383,9 +299,6 @@ function createWindow() {
             });
         }
     });
-
-    // Initialize CLI handlers
-    initializeCLI();
 }
 
 // Bot process management
@@ -412,7 +325,6 @@ async function startBot() {
 
         botProcess.stdout.on('data', (data) => {
             const output = data.toString();
-            mainWindow.webContents.send('terminal-output', output);
             console.log(output);
             
             if (output.includes('commands registered')) {
@@ -498,60 +410,6 @@ async function createTokenPrompt() {
             </body>
         </html>
     `);
-}
-
-function initializeCLI() {
-    ipcMain.on('cli-command', (event, command) => {
-        handleCLICommand(command);
-    });
-}
-
-async function handleCLICommand(command) {
-    const args = command.split(' ');
-    const cmd = args[0].toLowerCase();
-
-    switch(cmd) {
-        case 'start':
-            await startBot();
-            break;
-        case 'stop':
-            stopBot();
-            break;
-        case 'status':
-            sendStatus();
-            break;
-        case 'clear':
-            mainWindow.webContents.send('terminal-output', '\x1bc');
-            break;
-        case 'help':
-            showHelp();
-            break;
-        default:
-            mainWindow.webContents.send('terminal-output', `Unknown command: ${cmd}`);
-    }
-}
-
-function showHelp() {
-    const help = [
-        'Available Commands:',
-        '  start  - Start the bot',
-        '  stop   - Stop the bot',
-        '  status - Show bot status',
-        '  clear  - Clear terminal',
-        '  help   - Show this help'
-    ].join('\n');
-    mainWindow.webContents.send('terminal-output', help);
-}
-
-function sendStatus() {
-    const status = [
-        `Status    : ${botProcess ? 'Running' : 'Stopped'}`,
-        `Uptime    : ${getUptime()}`,
-        `Commands  : ${commandsExecuted}`,
-        `Guilds    : ${botInfo.guilds}`,
-        `Registered: ${botInfo.registeredCommands}`
-    ].join('\n');
-    mainWindow.webContents.send('terminal-output', status);
 }
 
 function updateTitleBar() {

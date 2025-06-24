@@ -23,6 +23,17 @@ module.exports = {
         .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
 
     async execute(interaction) {
+        // Initialize maps if they don't exist to avoid undefined errors
+        if (!interaction.client.stickyMessages) {
+            interaction.client.stickyMessages = new Map();
+        }
+        if (!interaction.client.activeChannels) {
+            interaction.client.activeChannels = new Set();
+        }
+        if (!interaction.client.stickyLastSent) {
+            interaction.client.stickyLastSent = new Map();
+        }
+
         const subcommand = interaction.options.getSubcommand();
         
         if (subcommand === 'set') {
@@ -46,8 +57,9 @@ module.exports = {
 
     async removeSticky(interaction) {
         const channelId = interaction.channel.id;
-        this.client.stickyMessages.delete(channelId);
-        this.client.activeChannels.delete(channelId); // Remove from active channels
+        // Use interaction.client instead of this.client
+        interaction.client.stickyMessages.delete(channelId);
+        interaction.client.activeChannels.delete(channelId); // Remove from active channels
         await interaction.reply({ content: 'Sticky message removed!', ephemeral: true });
     },
 
@@ -72,3 +84,4 @@ module.exports = {
         await fs.writeFile(STICKY_DATA_FILE, JSON.stringify(data, null, 2));
     }
 };
+

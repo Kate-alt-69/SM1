@@ -1,0 +1,22 @@
+{
+  "name": "server-manager-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for server management",
+  "main": "DCB.js",
+  "scripts": {
+    "start": "node DCB.js",
+    "sDEV": "node DCB.js --dev",
+    "dev": "nodemon DCB.js --dev",
+    "reset": "node scripts/reset.js",
+    "resetdev": "node scripts/reset.js --dev"
+  },
+  "dependencies": {
+    "discord.js": "^14.14.1",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
