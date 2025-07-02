@@ -10,7 +10,10 @@ const ErrorCodes = {
     COMMAND_COOLDOWN: 'ERR_C_COLD_002',
     INVALID_CHANNEL: 'ERR_CHANNEL_001',
     INVALID_PERMISSIONS: 'ERR_PERM_002',
-    BOT_MISSING_PERMISSIONS: 'ERR_NO_PERM_003'
+    BOT_MISSING_PERMISSIONS: 'ERR_NO_PERM_003',
+    CONSOL_COMMMAND_FAILED: 'ERR_CONSOL_COMMAND_001',
+    CONSOLE_RECEIVED_FAILED: 'ERR_CONSOLE_RECEIVED_FAILED_002',
+    CONSOLE_SEND_FAILED: 'ERR_CONSOLE_SEND_FAILED_003',
 };
 
 const ErrorMessages = {
@@ -25,7 +28,10 @@ const ErrorMessages = {
     [ErrorCodes.COMMAND_COOLDOWN]: 'Please wait before using this command again.',
     [ErrorCodes.INVALID_CHANNEL]: 'This command cannot be used in this channel.',
     [ErrorCodes.INVALID_PERMISSIONS]: 'You need additional permissions to use this command.',
-    [ErrorCodes.BOT_MISSING_PERMISSIONS]: 'I need additional permissions to execute this command.'
+    [ErrorCodes.BOT_MISSING_PERMISSIONS]: 'I need additional permissions to execute this command.',
+    [ErrorCodes.CONSOL_COMMMAND_FAILED]: 'Failed to execute console command. Please try again. or contact the host.',
+    [ErrorCodes.CONSOLE_RECEIVED_FAILED]: 'Failed to receive the console message. in Console. Please try again.',
+    [ErrorCodes.CONSOLE_SEND_FAILED]: 'Failed to send to console command. Please try again later.'
 };
 
 // Add helper function for detailed error responses

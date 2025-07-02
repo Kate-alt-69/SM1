@@ -7,7 +7,7 @@ const DevScripts = require('./utils/devScripts');
 const { devCheck } = require('./scripts/dev');
 const { EmojiCache } = require('./utils/EmojiCache');
 const { BotDataManager } = require('./utils/BotDataManager');
-
+const { DataSavingSystem } = require('./utils/dataSAVINGsystem');
 class Bot extends Client {
     constructor() {
         super({
@@ -43,7 +43,6 @@ class Bot extends Client {
         };
 
         this.emojiCache = null;
-        this.dataManager = null;
     }
 
     async start() {
@@ -73,10 +72,12 @@ class Bot extends Client {
 
                         // 2. Initialize commands
                         await this.commandManager.loadCommands();
+                        await this.commandManager.registerCommands();
 
-                        // 3. Initialize data manager
-                        this.dataManager = new BotDataManager(this);
-                        await this.dataManager.initialize();
+                        // 3. Initialize data saving system
+                        if (this.dataSavingSystem) {
+                            await this.dataSavingSystem.initialize();
+                        }
 
                         // 4. Display final status
                         console.log('\n===========================================');
@@ -88,6 +89,7 @@ class Bot extends Client {
                         console.log(`🔑 Logged in with : ${this.tokenManager.getTokenInfo().maskedToken} [${this.tokenManager.getTokenInfo().source}]`);
                         console.log(`📁 Loaded CF      : ${this.commandManager.stats.mainCommands}`);
                         console.log(`🎮 Commands Total : ${this.commandManager.stats.totalCommands} (${this.commandManager.stats.mainCommands} main, ${this.commandManager.stats.subCommands} sub)`);
+                        console.log(`💾 Data System    : ${this.dataSavingSystem?.initialized ? 'Loaded ✅' : 'Not Loaded ❌'}`);
                         console.log('===========================================\n');
 
                         resolve();
