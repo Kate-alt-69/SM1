@@ -2,12 +2,100 @@ const { Client, GatewayIntentBits, ActivityType, Collection } = require('discord
 const { TokenManager } = require('./utils/TokenManager');
 const { CommandManager } = require('./utils/CommandManager');
 const { keepAlive } = require('./KA.js');
+<<<<<<< HEAD
 const { ConnectionManager } = require('./utils/ConnectionManager');
 const DevScripts = require('./utils/devScripts');
 const { devCheck } = require('./scripts/dev');
 const { EmojiCache } = require('./utils/EmojiCache');
 const { BotDataManager } = require('./utils/BotDataManager');
 const { DataSavingSystem } = require('./utils/dataSAVINGsystem');
+=======
+
+// Load environment variables
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+// Fix token loading and validation
+async function loadToken() {
+    try {
+        if (process.env.TOKEN_SM) {
+            console.log('Token [ENV] loaded using DEV mode');
+            return process.env.TOKEN_SM;      
+        }
+        console.log('[env] Token no found in .env, loading from config/token.json');
+        const data = await fs.readFile(
+            path.join(__dirname, 'config', 'token.json'),
+            'utf8'
+        ); 
+        const tokenData = JSON.parse(data);
+        return tokenData.token;
+    } catch (err) {
+        console.error('Failed to load token:', err);
+        return null;
+    }
+}
+
+function validateToken(token) {
+    if (!token) {
+        console.error('❌ Error: No bot token found!');
+        console.log('Looking for token in config/token.json');
+        return false;
+    }
+
+    if (!token.match(/^[\w-]{24}\.[\w-]{6}\.[\w-]{27}$/)) {
+        console.error('❌ Error: Invalid token format!');
+        return false;
+    }
+
+    return true;
+}
+
+class DataStorage {
+    constructor(bot) {
+        this.bot = bot;
+        this.dataFile = "bot_data.json";
+        this.bot.storedEmbeds = {};
+    }
+
+    async saveData() {
+        const data = {
+            stickyMessages: this.bot.stickyMessages,
+            stickyCooldowns: this.bot.stickyCooldowns,
+            guildStickyMessages: this.bot.guildStickyMessages || {},
+            serverInfo: this.bot.serverInfo,
+            storedEmbeds: this.bot.storedEmbeds
+        };
+
+        try {
+            await fs.writeFile(this.dataFile, JSON.stringify(data, null, 4));
+        } catch (e) {
+            console.error(`Error saving data: ${e}`);
+        }
+    }
+
+    async loadData() {
+        try {
+            const data = JSON.parse(await fs.readFile(this.dataFile, 'utf8'));
+            this.bot.stickyMessages = data.stickyMessages || {};
+            this.bot.stickyCooldowns = data.stickyCooldowns || {};
+            this.bot.guildStickyMessages = data.guildStickyMessages || {};
+            this.bot.serverInfo = data.serverInfo || {};
+            this.bot.storedEmbeds = data.storedEmbeds || {};
+        } catch (e) {
+            if (e.code === 'ENOENT') {
+                console.log("No existing data file found, starting fresh");
+                this.bot.storedEmbeds = {};
+            } else {
+                console.error(`Error loading data: ${e}`);
+            }
+        }
+    }
+
+    async autoSave() {
+        setInterval(() => this.saveData(), 300000); // Save every 5 minutes
+    }
+}
+
+>>>>>>> 58b805cff5e6e30e36635416aa963081d96c7315
 class Bot extends Client {
     constructor() {
         super({
