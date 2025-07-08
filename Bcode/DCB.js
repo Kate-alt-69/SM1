@@ -86,7 +86,7 @@ class Bot extends Client {
                         console.log(`📊 Servers In     : ${this.guilds.cache.size}`);
                         console.log(`🤖 Logged in As   : ${this.user.tag}`);
                         console.log(`🆔 Bot ID         : ${this.user.id}`);
-                        console.log(`🔑 Logged in with : ${this.tokenManager.getTokenInfo().maskedToken} [${this.tokenManager.getTokenInfo().source}]`);
+                        console.log(`🔑 Logged in with : ${this.tokenManager.getTokenInfo().maskedToken} ${this.tokenManager.getTokenInfo().source}`);
                         console.log(`📁 Loaded CF      : ${this.commandManager.stats.mainCommands}`);
                         console.log(`🎮 Commands Total : ${this.commandManager.stats.totalCommands} (${this.commandManager.stats.mainCommands} main, ${this.commandManager.stats.subCommands} sub)`);
                         console.log(`💾 Data System    : ${this.dataSavingSystem?.initialized ? 'Loaded ✅' : 'Not Loaded ❌'}`);

@@ -1,10 +1,9 @@
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
-const EmbedFormatter = require('./utils/format');
 const writeEmbedData = require('./FRMTTwrite');
 const readEmbedData = require('./FRMTTread');
-const DCB = require('./DCB');
+// const DCB = require('./DCB');
 class DataSavingSystem {
   constructor(client) {
     this.client = client;
@@ -176,13 +175,4 @@ class DataSavingSystem {
         return Buffer.concat([iv, encrypted]);
     }
 }
-
-class DataSavingSystem {
-    constructor(dataPath, encryptionKey) {
-        this.dataPath = dataPath;
-        this.encryptionKey = encryptionKey;
-        this.stagingPath = path.join(dataPath, 'Staging');
-    }
-}
-
 module.exports = DataSavingSystem;
