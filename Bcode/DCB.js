@@ -2,15 +2,12 @@ const { Client, GatewayIntentBits, ActivityType, Collection } = require('discord
 const { TokenManager } = require('./utils/TokenManager');
 const { CommandManager } = require('./utils/CommandManager');
 const { keepAlive } = require('./KA.js');
-<<<<<<< HEAD
-const { ConnectionManager } = require('./utils/ConnectionManager');
+//const { ConnectionManager } = require('./utils/ConnectionManager');
 const DevScripts = require('./utils/devScripts');
 const { devCheck } = require('./scripts/dev');
 const { EmojiCache } = require('./utils/EmojiCache');
 const { BotDataManager } = require('./utils/BotDataManager');
 const { DataSavingSystem } = require('./utils/dataSAVINGsystem');
-=======
-
 // Load environment variables
 dotenv.config({ path: path.join(__dirname, '.env') });
 
@@ -94,8 +91,6 @@ class DataStorage {
         setInterval(() => this.saveData(), 300000); // Save every 5 minutes
     }
 }
-
->>>>>>> 58b805cff5e6e30e36635416aa963081d96c7315
 class Bot extends Client {
     constructor() {
         super({
