@@ -1,3 +1,12 @@
+const { execSync } = require('child_process');
+const path = require('path');
+// Load Node_Modules
+try {
+    execSync('npm install', { stdio: 'inherit', cwd: __dirname });
+    console.log('✅ npm install completed');
+} catch (err) {
+    console.error('❌ npm install failed:', err);
+}
 const { Client, GatewayIntentBits, ActivityType, Collection } = require('discord.js');
 const { TokenManager } = require('./utils/TokenManager');
 const { CommandManager } = require('./utils/CommandManager');
@@ -8,28 +17,25 @@ const { devCheck } = require('./scripts/dev');
 const { EmojiCache } = require('./utils/EmojiCache');
 const { BotDataManager } = require('./utils/BotDataManager');
 const { DataSavingSystem } = require('./utils/dataSAVINGsystem');
-// Load environment variables
-dotenv.config({ path: path.join(__dirname, '.env') });
-
 // Fix token loading and validation
-async function loadToken() {
-    try {
-        if (process.env.TOKEN_SM) {
-            console.log('Token [ENV] loaded using DEV mode');
-            return process.env.TOKEN_SM;      
-        }
-        console.log('[env] Token no found in .env, loading from config/token.json');
-        const data = await fs.readFile(
-            path.join(__dirname, 'config', 'token.json'),
-            'utf8'
-        ); 
-        const tokenData = JSON.parse(data);
-        return tokenData.token;
-    } catch (err) {
-        console.error('Failed to load token:', err);
-        return null;
-    }
-}
+//async function loadToken() {
+//    try {
+//        if (process.env.TOKEN_SM) {
+//            console.log('Token [ENV] loaded using DEV mode');
+//            return process.env.TOKEN_SM;      
+//        }
+//        console.log('[env] Token no found in .env, loading from config/token.json');
+//        const data = await fs.readFile(
+//            path.join(__dirname, 'config', 'token.json'),
+//            'utf8'
+//        ); 
+//        const tokenData = JSON.parse(data);
+//        return tokenData.token;
+//    } catch (err) {
+//        console.error('Failed to load token:', err);
+//        return null;
+//    }
+//}
 
 function validateToken(token) {
     if (!token) {
