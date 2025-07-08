@@ -19,8 +19,28 @@ module.exports = {
         .setDescription('Create and manage embeds')
         .addSubcommand(subcommand =>
             subcommand
+                .setName('send')
+                .setDescription('Send Any Embeds Made in Server.')
+                .addStringOption(option =>
+                    option.setName('ID')
+                    .setRequired(true)
+                )
+                
+        )
+        .addSubcommand(subcommand =>
+            subcommand
+                .setName('search')
+                .setDescription('Search For Embeds In The Sevrer.')
+                .addStringOption(option =>
+                    option.setName('search')
+                        .setDescription('Search For Any Embed by Typing')
+                        .setRequired(true)
+                )
+        )
+        .addSubcommand(subcommand =>
+            subcommand
                 .setName('create')
-                .setDescription('Create a new embed')
+                .setDescription('Create Embed Using Embed Creation. (By K8)')
                 .addStringOption(option =>
                     option.setName('name')
                         .setDescription('Name/ID for the embed')
