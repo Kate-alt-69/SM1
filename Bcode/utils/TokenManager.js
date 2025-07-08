@@ -89,7 +89,7 @@ class TokenManager {
 📊 Servers In     : ${this.client?.guilds.cache.size || 0}
 🤖 Logged in As   : ${this.client?.user?.tag || 'Unknown'}
 🆔 Bot ID         : ${this.client?.user?.id || 'Unknown'}
-🔑 Logged in with : ${this.maskedToken} [${this.tokenSource}]
+🔑 Logged in with : ${this.maskedToken} ${this.tokenSource}
 📁 Loaded CF      : ${stats.mainCommands || 0}
 🎮 Commands Total : ${stats.commands || 0} (${stats.mainCommands} main, ${stats.subCommands} sub)
 ===========================================`
