@@ -14,11 +14,11 @@ class ConnectionManager {
 
     static async waitForInternet() {
         while (!(await this.checkInternet())) {
-            console.log('\n❌ No internet connection detected!');
-            console.log('Please check your internet connection and press Enter to retry...');
+            console.log('{ERROR}\n❌ No internet connection detected!');
+            console.log('1.Please check your internet connection and press Enter to retry...');
             await new Promise(resolve => process.stdin.once('data', resolve));
         }
-        console.log('✅ Internet connection established!\n');
+        console.log('[SYSTEM] ✅ Internet connection established!\n');
     }
 }
 
