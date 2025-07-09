@@ -41,17 +41,9 @@ class CommandLoader {
               } else if (err.message.includes('Invalid command structure')) {
                 Clogs.logError(`Invalid command structure in: ${file}`);
                 Clogs.logError(`Error: ${err.message}`);
-            }
         }
+      }
     }
+  }
 }
-
-    async registerCommands() {
-        const commands = [...this.client.commands.values()];
-        await this.client.application?.commands.set(
-            commands.map(cmd => cmd.data.toJSON())
-        );
-    }
-}
-
 module.exports = { CommandLoader };

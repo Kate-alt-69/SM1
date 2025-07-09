@@ -12,34 +12,34 @@ class TokenManager {
         this.isDev = false;
         
         // Add debug logging
-        console.log('📝 TokenManager initialized with paths:');
+        console.log('[SYSTEM] 📝 TokenManager initialized with paths:');
         console.log(`   Config: ${this.configPath}`);
         console.log(`   Env: ${this.envPath}`);
     }
 
     async loadToken() {
         try {
-            console.log('\n🔄 Starting token load sequence');
-            console.log('🔍 Checking token sources...');
+            console.log('\n[SYSTEM] 🔄 Starting token load sequence');
+            console.log('[SYSTEM] 🔍 Checking token sources...');
 
             const envConfig = dotenv.config({ path: this.envPath });
             const isDevMode = envConfig.parsed?.MODE === 'DEV';
             
             if (isDevMode) {
-                console.log('🔧 Development mode detected');
+                console.log('[SYSTEM] 🔧 Development mode detected');
                 const envToken = envConfig.parsed?.TOKEN;
 
                 if (!envToken || envToken === 'your-bot-token-here') {
-                    console.error('\n❌ Development Mode Error:');
+                    console.error('[HINT] : \n❌ Development Mode Error:');
                     console.error('The default token value was found in .env file');
                     console.error('\n📝 Please add your bot token:');
                     console.error('1. Open Bcode/.env file');
                     console.error('2. Replace "your-bot-token-here" with your actual bot token');
                     console.error('3. Keep MODE=DEV enabled\n');
-                    throw new Error('Invalid token in DEV mode - using default value');
+                    throw new Error('{ERROR} ❌ Invalid token in DEV mode - using default value');
                 }
 
-                console.log('✅ Successfully loaded token from .env [DEV MODE]');
+                console.log('[SYSTEM] ✅ Successfully loaded token from .env [DEV MODE]');
                 this.setTokenInfo(envToken, '.env [DEV MODE]');
                 this.isDev = true;
                 return envToken;
@@ -52,9 +52,9 @@ class TokenManager {
                 return jsonToken;
             }
 
-            throw new Error('No valid token found');
+            throw new Error('[SYSTEM] No valid token found');
         } catch (err) {
-            console.error(`\n❌ Token loading failed: ${err.message}`);
+            console.error(`{ERROR} \n❌ Token loading failed: ${err.message} \n 📝 Please check your configuration files. \n Bcode/ .env \n Bcode/ config/ token.json`);
             return null;
         }
     }
@@ -69,8 +69,8 @@ class TokenManager {
         this.tokenSource = source;
         // Mask more of the token for security
         this.maskedToken = `${token.slice(0, 5)}...${token.slice(-5)}`;
-        console.log(`✅ Token source set to: ${source}`);
-        console.log(`✅ Token validated and masked: ${this.maskedToken}`);
+        console.log(`[SYSTEM] ✅ Token source set to: ${source}`);
+        console.log(`[SYSTEM] ✅ Token validated and masked: ${this.maskedToken}`);
     }
 
     getTokenInfo() {
@@ -84,15 +84,15 @@ class TokenManager {
             source: this.tokenSource || 'Unknown',
             maskedToken: this.maskedToken || 'Not Available',
             displayString: `===========================================
-              BOT STATUS                   
-===========================================
-📊 Servers In     : ${this.client?.guilds.cache.size || 0}
-🤖 Logged in As   : ${this.client?.user?.tag || 'Unknown'}
-🆔 Bot ID         : ${this.client?.user?.id || 'Unknown'}
-🔑 Logged in with : ${this.maskedToken} ${this.tokenSource}
-📁 Loaded CF      : ${stats.mainCommands || 0}
-🎮 Commands Total : ${stats.commands || 0} (${stats.mainCommands} main, ${stats.subCommands} sub)
-===========================================`
+                                            BOT STATUS                   
+                            ===========================================
+                            📊 Servers In     : ${this.client?.guilds.cache.size || 0}
+                            🤖 Logged in As   : ${this.client?.user?.tag || 'Unknown'}
+                            🆔 Bot ID         : ${this.client?.user?.id || 'Unknown'}
+                            🔑 Logged in with : ${this.maskedToken} ${this.tokenSource}
+                            📁 Loaded CF      : ${stats.mainCommands || 0}
+                            🎮 Commands Total : ${stats.commands || 0} (${stats.mainCommands} main, ${stats.subCommands} sub)
+                            ===========================================`
         };
     }
 
@@ -114,7 +114,7 @@ class TokenManager {
             const activeBot = botData.bots.find(b => b.active);
             return activeBot?.token;
         } catch (err) {
-            console.error('Failed to load bot data:', err);
+            console.error('{ERROR} ❌ Failed to load bot data:', err);
             return null;
         }
     }
@@ -123,10 +123,10 @@ class TokenManager {
         try {
             await fs.mkdir(path.dirname(this.configPath), { recursive: true });
             await fs.writeFile(this.configPath, JSON.stringify({ token }, null, 2));
-            console.log('✅ Token saved successfully');
+            console.log('[SYSTEM] ✅ Token saved successfully');
             return true;
         } catch (error) {
-            console.error('❌ Failed to save token:', error);
+            console.error('{ERROR} ❌ Failed to save token:', error);
             return false;
         }
     }
