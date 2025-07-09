@@ -1,12 +1,5 @@
-const { execSync } = require('child_process');
 const path = require('path');
-// Load Node_Modules
-try {
-    execSync('npm install', { stdio: 'inherit', cwd: __dirname });
-    console.log('✅ npm install completed');
-} catch (err) {
-    console.error('❌ npm install failed:', err);
-}
+require('./utils/moduleCHK').checkAndInstallModules(__dirname);
 const { Client, GatewayIntentBits, ActivityType, Collection } = require('discord.js');
 const { TokenManager } = require('./utils/TokenManager');
 const { CommandManager } = require('./utils/CommandManager');
@@ -36,22 +29,6 @@ const { DataSavingSystem } = require('./utils/dataSAVINGsystem');
 //        return null;
 //    }
 //}
-
-function validateToken(token) {
-    if (!token) {
-        console.error('❌ Error: No bot token found!');
-        console.log('Looking for token in config/token.json');
-        return false;
-    }
-
-    if (!token.match(/^[\w-]{24}\.[\w-]{6}\.[\w-]{27}$/)) {
-        console.error('❌ Error: Invalid token format!');
-        return false;
-    }
-
-    return true;
-}
-
 class DataStorage {
     constructor(bot) {
         this.bot = bot;
@@ -85,10 +62,10 @@ class DataStorage {
             this.bot.storedEmbeds = data.storedEmbeds || {};
         } catch (e) {
             if (e.code === 'ENOENT') {
-                console.log("No existing data file found, starting fresh");
+                console.log("[SYSTEM] 📝 No existing data file found, starting fresh");
                 this.bot.storedEmbeds = {};
             } else {
-                console.error(`Error loading data: ${e}`);
+                console.error(`{ERROR} loading data: ${e}`);
             }
         }
     }
@@ -136,17 +113,17 @@ class Bot extends Client {
 
     async start() {
         try {
-            console.log('🔄 Starting bot initialization...');
+            console.log('[SYSTEM]🔄 Starting bot initialization...');
 
             // Add startup timeout
             const startupTimeout = setTimeout(() => {
-                throw new Error('Bot startup timed out after 60 seconds');
+                throw new Error('[ERROR] Bot startup timed out after 60 seconds');
             }, 60000);
 
             // Get token
             const token = await this.tokenManager.loadToken();
             if (!token) {
-                throw new Error('Failed to load token');
+                throw new Error('[ERRPR] Failed to load token');
             }
 
             // Single ready event with all initialization
@@ -191,7 +168,7 @@ class Bot extends Client {
             });
 
         } catch (error) {
-            console.error('❌ Startup error:', error);
+            console.error('{ERROR} ❌ Startup error:', error);
             process.exit(1);
         }
     }
@@ -201,11 +178,11 @@ class Bot extends Client {
         this.connectionCheckInterval = setInterval(async () => {
             const hasConnection = await ConnectionManager.checkInternet();
             if (!hasConnection) {
-                console.log('\n⚠️ Internet connection lost!');
+                console.log('{startupERROR} \n⚠️ Internet connection lost!');
                 await ConnectionManager.waitForInternet();
                 // Reconnect bot if needed
                 if (!this.isReady()) {
-                    console.log('🔄 Reconnecting bot...');
+                    console.log('[SYSTEM]🔄 Reconnecting bot...');
                     await this.login(this.token);
                 }
             }
@@ -334,7 +311,6 @@ class Bot extends Client {
                 if (!this.stickyCooldowns) this.stickyCooldowns = new Map();
                 if (!this.stickyLastSent) this.stickyLastSent = new Map();
             }
-            // ...rest of try block...
         } catch (error) {
             // Add specific sticky error handling
             if (interaction.commandName === 'sticky') {
@@ -344,7 +320,6 @@ class Bot extends Client {
                     ephemeral: true
                 };
             }
-            // ...rest of catch block...
         }
     }
 
