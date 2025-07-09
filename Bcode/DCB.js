@@ -156,7 +156,7 @@ class Bot extends Client {
                         console.log(`📁 Loaded CF      : ${this.commandManager.stats.mainCommands}`);
                         console.log(`🎮 Commands Total : ${this.commandManager.stats.totalCommands} (${this.commandManager.stats.mainCommands} main, ${this.commandManager.stats.subCommands} sub)`);
                         console.log(`💾 Data System    : ${this.dataSavingSystem?.initialized ? 'Loaded ✅' : 'Not Loaded ❌'}`);
-                        console.log('===========================================\n');
+                        console.log('===========================================\n pres CTRL + C to stop from hosting');
 
                         resolve();
                     } catch (error) {

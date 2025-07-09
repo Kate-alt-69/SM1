@@ -15,13 +15,13 @@ class CommandManager {
         };
         this.commandsPath = path.join(__dirname, '../commands');
         this.isRegistering = false;
-        console.log('📝 CommandManager: Initializing...');
+        console.log('[SYSTEM] 📝 CommandManager: Initializing...');
     }
 
     async loadCommands() {
         try {
-            console.log('\n📝 Loading commands...');
-            console.log('🔄 Loading commands...');
+            console.log('[SYSTEM] 📝 Loading commands...');
+            console.log('[SYSTEM] 🔄 Loading commands...');
             
             const files = await fs.readdir(this.commandsPath);
             let validFiles = 0;
@@ -53,14 +53,19 @@ class CommandManager {
                         }
 
                         this.commands.set(command.data.name, command);
-                        console.log(`✅ Loaded command: ${command.data.name}`);
+                        console.log(`[SYSTEM] ✅ Loaded command: ${command.data.name}`);
                     } else {
-                        console.warn(`⚠️ Invalid command structure in ${file}`);
+                        console.warn(`{ERROR}⚠️ Invalid command structure in ${file}`);
                         this.stats.skippedFiles++;
                     }
                 } catch (error) {
-                    console.error(`❌ Failed to load ${file}:`, error.message);
+                    console.error(`{FILE.ERROR}❌ Failed to load ${file}:`, error.message);
                     this.stats.failedCommands++;
+
+                    // Use CommandLoader to get detailed error information
+                    const commandLoader = new CommandLoader(this);
+                    const detailedError = await commandLoader.getDetailedError(file, error);
+                    console.error(detailedError);
                 }
             }
 
@@ -76,7 +81,7 @@ class CommandManager {
             // Register commands only once
             return await this.registerCommands();
         } catch (error) {
-            console.error('❌ Failed to load commands:', error);
+            console.error('{ERROR} ❌ Failed to load commands:', error);
             return false;
         }
     }
@@ -86,10 +91,10 @@ class CommandManager {
         this.isRegistering = true;
 
         try {
-            console.log('🔄 Registering commands...');
+            console.log('[SYSTEM] 🔄 Registering commands...');
             const commands = [...this.commands.values()].map(cmd => cmd.data.toJSON());
             await this.client.application?.commands.set(commands);
-            console.log(`✅ Registered ${commands.length} commands globally`);
+            console.log(`[SYSTEM] ✅ Registered ${commands.length} commands globally`);
             
             // Update bot stats safely
             if (this.client) {
@@ -104,7 +109,7 @@ class CommandManager {
             return true;
         } catch (error) {
             this.isRegistering = false;
-            console.error('❌ Failed to register commands:', error);
+            console.error('[ERROR] ❌ Failed to register commands:', error);
             return false;
         }
     }

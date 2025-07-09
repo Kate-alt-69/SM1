@@ -17,7 +17,7 @@ function checkAndInstallModules(baseDir) {
         console.log('[SYSTEM]📦 node_modules not found. Running npm install...');
         try {
             execSync('npm install', { stdio: 'inherit', cwd: baseDir });
-            console.log('✅ npm install completed');
+            console.log('[SYSTEM]✅ npm install completed');
         } catch (err) {
             console.error('{ERROR} ❌ npm install failed:', err);
             console.error('[HINT] Please check your internet connection and package.json for errors.');

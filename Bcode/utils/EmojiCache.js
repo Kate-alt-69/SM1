@@ -12,18 +12,18 @@ class EmojiCache {
     }
 
     async loadEmojis() {
-        console.log('\n🔄 Loading application emojis...');
+        console.log('\n[SYSTEM] 🔄 Loading application emojis...');
         
         try {
             const botEmojis = Array.from(this.client.emojis.cache.values());
-            console.log(`📥 Fetched ${botEmojis.length} emojis from application`);
+            console.log(`[SYSTEM] 📥 Fetched ${botEmojis.length} emojis from application`);
             
             // Clear existing data
             this.staticEmojis.clear();
             this.animatedEmojis.clear();
             
             // Process each emoji with detailed logging
-            console.log('\n📋 Emoji Fetch Log:');
+            console.log('\n[EMOJI]📋 Emoji Fetch Log:');
             botEmojis.forEach(emoji => {
                 const emojiData = {
                     id: emoji.id,
@@ -57,14 +57,14 @@ class EmojiCache {
             console.log(`   • Total Emojis: ${this.staticEmojis.size + this.animatedEmojis.size}\n`);
             
             // Log status
-            console.log(`✅ Loaded and saved ${this.staticEmojis.size} static and ${this.animatedEmojis.size} animated emojis`);
+            console.log(`[SYSTEM] ✅ Loaded and saved ${this.staticEmojis.size} static and ${this.animatedEmojis.size} animated emojis`);
             
             // Also save to emoji_data.json for backward compatibility
             await this.saveLegacyFormat();
             
             return true;
         } catch (error) {
-            console.error('❌ Error loading emojis:', error);
+            console.error('{ERROR} ❌ Error loading emojis:', error);
             return false;
         }
     }
@@ -99,7 +99,7 @@ class EmojiCache {
 
             console.log(`   • Saved emoji data to:\n     - ${path.basename(this.staticFile)}\n     - ${path.basename(this.animatedFile)}`);
         } catch (error) {
-            console.error('❌ Error saving emoji files:', error);
+            console.error('{ERROR} ❌ Error saving emoji files:', error);
             throw error;
         }
     }
@@ -117,7 +117,7 @@ class EmojiCache {
             
             await fs.writeFile(legacyPath, JSON.stringify(legacyData, null, 2));
         } catch (error) {
-            console.error('❌ Error saving legacy emoji data:', error);
+            console.error('{ERROR} ❌ Saving legacy emoji data:', error);
         }
     }
 
