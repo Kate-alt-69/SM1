@@ -52,9 +52,9 @@ class TokenManager {
                 return jsonToken;
             }
 
-            throw new Error('[SYSTEM] No valid token found');
+            throw new Error('[SYSTEM] No valid token found\n  📝 Please ensure you have run "dcb token save <YOUR-TOKEN>" before starting bot.');
         } catch (err) {
-            console.error(`{ERROR} \n❌ Token loading failed: ${err.message} \n 📝 Please check your configuration files. \n Bcode/ .env \n Bcode/ config/ token.json`);
+            console.error(`{ERROR} \n❌ Token loading failed: ${err.message} \n  📝 Please check your configuration files. \n Bcode/ config/ token.json`);
             return null;
         }
     }
