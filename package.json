@@ -9,7 +9,6 @@
     "dev": "neu run --frontend-lib-dev"
   },
   "dependencies": {
-    "@neutralinojs/neu": "^9.8.0",
     "xterm": "^5.3.0"
   },
   "author": "",
