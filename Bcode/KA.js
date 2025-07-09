@@ -7,7 +7,7 @@ function keepAlive() {
     });
     
     server.listen(3000, () => {
-        console.log('Server is ready.');
+        console.log('[SYSTEM] 🌐 Server is ready.');
     });
 }
 
