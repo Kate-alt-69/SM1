@@ -20,15 +20,12 @@ jobs:
         python-version: '3.8'
         
     - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
+      run: cd Bcode
+        npm install
         
     - name: Create .env file
       run: |
         echo "TOKEN_SM=${{ secrets.TOKEN_SM }}" > .env
       
     - name: Run bot
-      run: python DCB.py
-      env:
-        TOKEN_SM: ${{ secrets.TOKEN_SM }}
+      run: node Bcode/DCB.js
