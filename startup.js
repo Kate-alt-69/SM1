@@ -1,9 +1,14 @@
-const fs = require('fs');
+const { join } = require('path');
 const path = require('path');
 const { execSync } = require('child_process');
-const childProcess = require('child_process');
-const bcodePath = path.join(__dirname, 'Bcode');
-const os = require('os');
+const moduleCHK = require('./Bcode/utils/moduleCHK');
+console.log('[STARTUP] 📝 Bcode Startup Script installing NODE_MODULES');
+moduleCHK.checkAndInstallModules(path.join(__dirname, 'Bcode'));
+console.log('[STARTUP] 📝 Bcode Startup Script NODE_MODULE installed..');
+const TokenEditorUtility = require('./Utility/tokenEditorUtility');
+const startup = require('./Utility/CMDstartup')(CMDtoggle);
+const bcodePath = join(__dirname, 'Bcode');
+const tokenEditor = new TokenEditorUtility();
 console.log('[STARTUP] 📝 Bcode Startup Script Online');
 console.log('[STARTUP]\n⚙ Working Commands\n2.dcb token save <TOKEN>\n3.dcb token edit <NEW_TOKEN>\n4.dcb token delete\n5.dcb start\n6.dcb stop\n7.dcb restart\n8.dcb help\n\n⚙ Working STARTUP Commands\n1.su shutdown\n2.su help');
 // Function toget OS
@@ -84,41 +89,43 @@ const tokenExists = () => {
 
 // Function to edit token
 const editToken = (newToken) => {
-  const tokenJsonPath = path.join(bcodePath, 'config', 'token.json');
-  const tokenJson = JSON.parse(fs.readFileSync(tokenJsonPath, 'utf8'));
-  tokenJson.token = newToken;
-  fs.writeFileSync(tokenJsonPath, JSON.stringify(tokenJson, null, 2));
+  const tokenEditor = new TokenEditorUtility();
+  const errorMessage = tokenEditor.editToken(newToken);
+  if (errorMessage) {
+    console.log(errorMessage);
+  } else {
+    console.log('[STARTUP] ✔️ Token edited successfully');
+  }
 };
 
 // Function to delete token
 const deleteToken = () => {
-  const tokenJsonPath = path.join(bcodePath, 'config', 'token.json');
-  const tokenJson = JSON.parse(fs.readFileSync(tokenJsonPath, 'utf8'));
-  tokenJson.token = '';
-  fs.writeFileSync(tokenJsonPath, JSON.stringify(tokenJson, null, 2));
+  const tokenEditor = new TokenEditorUtility();
+  tokenEditor.deleteToken();
   console.log('[STARTUP] ✔️ Token deleted successfully');
   console.log('[STARTUP] 🚨 Please create a new token using the command:\n "dcb token save <TOKEN>"');
 };
 
 // Function to save token
 const saveToken = (token) => {
-  const tokenJsonPath = path.join(bcodePath, 'config', 'token.json');
-  console.log(`[STARTUP] 📝 Saving token to ${tokenJsonPath}`);
-  const tokenJson = { token };
-  fs.writeFileSync(tokenJsonPath, JSON.stringify(tokenJson, null, 2));
-  console.log('[STARTUP] ✔️ Token saved successfully');
+  const errorMessage = tokenEditor.validateToken(token);
+  if (errorMessage) {
+    console.log(errorMessage);
+  } else {
+    tokenEditor.saveToken(token);
+    console.log('[STARTUP] Token saved successfully');
+  }
 };
-const startBot = () => {
-  console.log('[STARTUP] 🚀 Starting bot...');
-  const botProcess = childProcess.spawn('node', ['--title', 'DISCORDSERVERMANAGER', path.join(bcodePath, 'DCB.js')]);
-  botPid = botProcess.pid;
-  console.log('[STARTUP] ✔️ Bot will start in a few seconds');
-  botProcess.stdout.pipe(process.stdout);
-  botProcess.stderr.pipe(process.stderr);
-};
+async function startBot() {
+  await startup();
+  const commandLoader = new CommandLoader();
+  await commandLoader.loadCommands();
+  const commandManager = new CommandManager(commandLoader);
+  // Start the bot here...
+}
 // Function to stop bot
 const stopBot = () => {
-  console.log('[STARTUP] ⛔️ Stopping bot...');
+  console.log('[STARTUP] ✔️ Stopping bot...');
   if (botPid) {
     const os = process.platform;
     let command;
@@ -191,7 +198,7 @@ const shutdownProcess = () => {
     fs.rmdirSync(nodeModulesPath, { recursive: true });
     console.log('[STARTUP] ✔️ node_modules folder deleted successfully');
   } else {
-    console.log('[STARTUP] No node_modules folder found. Shutting down process...');
+    console.log('[STARTUP] ✔️ No node_modules folder found. Shutting down process...');
   }
   console.log('[STARTUP] ✔️ shutting down...');
   process.exit(0);
@@ -245,6 +252,7 @@ process.stdin.on('data', (data) => {
     'dcb token delete',
     'dcb token save',
     'dcb token help',
+    "dcb re-toggle",
     'dcb start',
     'dcb stop',
     'dcb restart',
