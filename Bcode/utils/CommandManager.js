@@ -73,7 +73,7 @@ class CommandManager {
             this.stats.totalCommands = this.stats.mainCommands + this.stats.subCommands;
 
             // Print loading stats
-            console.log('\n📊 Command loading complete:');
+            console.log('[SYSTEM]\n📊 Command loading complete:');
             console.log(`            ✅ Loaded: ${this.stats.totalCommands} (${this.stats.mainCommands} main, ${this.stats.subCommands} sub)`);
             console.log(`            ❌ Failed: ${this.stats.failedCommands}`);
             console.log(`            ⏭️ Skipped: ${this.stats.skippedFiles}\n`);
@@ -85,7 +85,7 @@ class CommandManager {
             return false;
         }
     }
-
+  
     async registerCommands() {
         if (this.isRegistering) return;
         this.isRegistering = true;
