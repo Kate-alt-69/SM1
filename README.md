@@ -39,4 +39,25 @@ DEBUGGER=true
 ## About K8 (me)
 So. where ware we.. oh yeah i was talking to you about why did i create this project lets talk about how. <br>
 well this whole thing started with me being curious about coding and well i don't have someone who could teach me coding <br>
-but i knew 
+but i knew [YouTube](https://youtube.com/) was a good place to learn stuff from and i found a lot of diffrent tutorials on Python Node.js HTML CSS styling, <br>
+and i was pretty good at learning at the starting but i was kinda using Github Cop (Copilot) a lot. <br>
+and i did lern some stuff like async, function, cosnt, import, module.export and a lot of diffrent things but it was slow at first<br>
+but then things started to take a MASSIVE turn when i started messing things with 
+```
+discord.js
+```
+and it was quit fun on the Python side but then i started doing stuff on node.js then it started getting hard cause there was about none <br>
+youtube tutorials about it's functions so i started using [ChatGPT](https://chatgpt.com/) and it has Improved a lot since i have been starting to use it <br>
+and yes i did use chatgpt to cleanify my code a little bit since i was a bit lost but in the end it all works great <br>
+and at this time im writing this README.md im still making the jump to DCB-1.2.0 and trust me it's gonna be a MASSIVE jump <br>
+so where ware we yeah it was a bit hard for me to learn discord.js since i couldn't fine any good tutorils about the discord.js<br>since most of them ware jsut begginer lvl coding and i wanted a full on tutorial about discord.js and it's networking and API functions
+## Places You Can Fine K8 
+- Discord you can send me a FR
+```
+  <309000404041547776>
+```
+- [Instagram](https://www.instagram.com/dhwanksh/)<br>
+  QR code<br>
+ <img width="500" height="560" alt="dhwanksh_qr" src="https://github.com/user-attachments/assets/28e883a5-3060-4aca-bc55-de08e2b1b5af" /><br>
+- [Reddit](https://www.reddit.com/user/Helloiamkate_69/)<br>
+- [Spotify](https://open.spotify.com/user/31b35qefpdsqh2vt7feujr63mygq?si=046a37f1761e48bf)
