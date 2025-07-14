@@ -1,0 +1,57 @@
+{
+  "about": {
+    "about": true
+  },
+  "console": {
+    "console.report": true,
+    "console.message": true,
+    "console.tell": true,
+    "console.host": true,
+    "console.runtime": true
+  },
+  "embed": {
+    "embed.create": true,
+    "embed.template": true,
+    "embed.send": true,
+    "embed.embed_id": true,
+    "embed.channel": true
+  },
+  "emojitest": {
+    "emojitest": true
+  },
+  "fun": {
+    "fun.8ball": true,
+    "fun.question": true,
+    "fun.flip": true,
+    "fun.roll": true,
+    "fun.sides": true
+  },
+  "help": {
+    "help": true
+  },
+  "kick": {
+    "kick.member": true,
+    "kick.reason": true
+  },
+  "ping": {
+    "ping": true
+  },
+  "create": {
+    "create.question": true
+  },
+  "role": {
+    "role.add": true,
+    "role.user": true,
+    "role.role": true,
+    "role.remove": true
+  },
+  "sticky": {
+    "sticky.message": true,
+    "sticky.cooldown": true
+  },
+  "utility": {
+    "utility.util": true,
+    "utility.ping": true,
+    "utility.about": true
+  }
+}

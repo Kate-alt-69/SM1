@@ -1,7 +1,12 @@
-const fs = require('fs');
-const path = require('path');
-const { bcodePath } = require('../defined/path-define');
-const { TokenManager } = require('../Bcode/utils/TokenManager');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { bcodePath } from '../defined/path-define.js';
+import { TokenManager } from '../Bcode/utils/TokenManager.js';
+
+// __dirname polyfill for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class TokenEditorUtility {
   constructor() {
@@ -62,4 +67,4 @@ class TokenEditorUtility {
   }
 }
 
-module.exports = TokenEditorUtility;
+export default TokenEditorUtility;

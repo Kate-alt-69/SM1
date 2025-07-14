@@ -1,0 +1,1 @@
+  moduleCHK.checkAndInstallModules(path.join(__dirname, 'Bcode'));

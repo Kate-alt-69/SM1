@@ -1,30 +1,39 @@
-const path = require('path');
-const fs = require('fs');
-const { execSync } = require('child_process');
+// KERNEL.js 
+console.log('[STARTUP] Starting Bcode Startup Script...');
 
-const KNchecksum = require('./Utility/KNchecksum');
-const moduleCHK = require('./Bcode/utils/moduleCHK');
-const TokenEditorUtility = require('./Utility/tokenEditorUtility');
-const startup = require('./Utility/CMDstartup');
-const { bcodePath } = require('./defined/path-define');
-const { toggleCommand, createCommandsJson } = require('./Utility/CMDtoggle');
+import path from 'path';
+import fs from 'fs';
+import { execSync } from 'child_process';
+import { fileURLToPath } from 'url';
 
+import { checkBcodeStructure } from './Utility Module/KNchecksum.js';
+import moduleCHK from './Bcode/utils/moduleCHK.js';
+import startup from './Utility Module/CMDstartup.js';
+import {
+  bcodePath,
+  tokenPath,
+  cmdPath,
+  commandsJsonPath
+} from './defined/path-define.js';
+import { toggleCommand, createCommandsJson } from './Utility Module/CMDtoggle.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ✅ Run structure check
+await checkBcodeStructure();
+console.log('[CHECK] ✔️ Bcode structure verified successfully!');
+
+// 📦 Ensure node_modules is installed before using packages like dotenv
+console.log('[STARTUP] 📝 Bcode Startup Script installing NODE_MODULES');
+await moduleCHK.checkAndInstallModules(bcodePath);
+console.log('[STARTUP] 📝 Bcode Startup Script Online');
+
+// 🕐 Dynamically import TokenEditorUtility AFTER node_modules are available
+const { default: TokenEditorUtility } = await import('./Utility Module/TokenEditorUtility.js');
 const tokenEditor = new TokenEditorUtility();
 
-async function init() {
-  await KNchecksum.checkBcodeStructure();
-  console.log('[CHECK] ✔️ Bcode structure verified successfully!');
-  console.log('[STARTUP] 📝 Bcode Startup Script installing NODE_MODULES');
-  moduleCHK.checkAndInstallModules(path.join(__dirname, 'Bcode'));
-  console.log('[STARTUP] 📝 Bcode Startup Script Online');
-  return true;
-}
-
-(async () => {
-  await init();
-  createCommandsJson();
-})();
-
+// 🖥 OS Detection
 const getOS = () => {
   switch (process.platform) {
     case 'win32': return 'Windows';
@@ -36,6 +45,7 @@ const getOS = () => {
 
 console.log(`Operating System: ${getOS()}`);
 
+// 🔍 Windows-specific PID checker
 const getPidFromTasklist = (command) => {
   const output = execSync(command).toString();
   const regex = /node.exe\s+(\d+)/g;
@@ -45,7 +55,6 @@ const getPidFromTasklist = (command) => {
   }
   return null;
 };
-
 const getPidFromPs = (command) => {
   const output = execSync(command).toString();
   const regex = /node\s+(\d+)/g;
@@ -72,9 +81,8 @@ const getBotPid = () => {
 let botPid;
 
 const tokenExists = () => {
-  const tokenJsonPath = path.join(bcodePath, 'config', 'token.json');
   try {
-    const tokenJson = JSON.parse(fs.readFileSync(tokenJsonPath, 'utf8'));
+    const tokenJson = JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
     return tokenJson.token !== '';
   } catch {
     return false;
@@ -90,7 +98,7 @@ const editToken = (newToken) => {
 const deleteToken = () => {
   tokenEditor.deleteToken();
   console.log('[STARTUP] ✔️ Token deleted successfully');
-  console.log('[STARTUP] 🚨 Please create a new token using the command:\n "dcb token save <TOKEN>"');
+  console.log('[STARTUP] 🚨 Please create a new token using the command:\n "# token save <TOKEN>"');
 };
 
 const saveToken = (token) => {
@@ -122,7 +130,7 @@ const stopBot = () => {
   const nodeModulesPath = path.join(bcodePath, 'node_modules');
   if (fs.existsSync(nodeModulesPath)) {
     console.log('[STARTUP] 🗑 Deleting node_modules folder...');
-    fs.rmdirSync(nodeModulesPath, { recursive: true });
+    fs.rmSync(nodeModulesPath, { recursive: true, force: true });
     console.log('[STARTUP] ✔️ node_modules folder deleted successfully');
   } else {
     console.log('[STARTUP] No node_modules folder found.');
@@ -142,12 +150,10 @@ const restartBot = () => {
     startBot();
   }
 };
-
 if (!tokenExists()) {
   console.log('[STARTUP] 🚨 No token found, please create one using the command:');
-  console.log('  dcb token save <token>');
+  console.log('  # token save <token>');
 }
-
 const shutdownProcess = () => {
   console.log('[STARTUP] ⛔️ Shutting down process...');
   if (botPid) {
@@ -155,11 +161,10 @@ const shutdownProcess = () => {
     execSync(command);
     console.log('[STARTUP] ✔️ Bot stopped successfully');
   }
-
   const nodeModulesPath = path.join(bcodePath, 'node_modules');
   if (fs.existsSync(nodeModulesPath)) {
     console.log('[STARTUP] 🗑 Deleting node_modules folder...');
-    fs.rmdirSync(nodeModulesPath, { recursive: true });
+    fs.rmSync(nodeModulesPath, { recursive: true, force: true });
     console.log('[STARTUP] ✔️ node_modules folder deleted successfully');
   } else {
     console.log('[STARTUP] ✔️ No node_modules folder found. Shutting down process...');
@@ -167,12 +172,6 @@ const shutdownProcess = () => {
   console.log('[STARTUP] ✔️ shutting down...');
   process.exit(0);
 };
-
-const CMDtoggleCommand = (commandName) => {
-  const toggle = require('./Utility/CMDtoggle');
-  toggle.toggleCommand(commandName);
-};
-
 function suggestClosestCommand(command, availableCommands) {
   const levenshtein = (a, b) => {
     const an = a.length, bn = b.length;
@@ -190,17 +189,15 @@ function suggestClosestCommand(command, availableCommands) {
     }
     return matrix[an][bn];
   };
-
   return availableCommands.reduce((closest, cmd) => {
     const distance = levenshtein(command, cmd);
     return distance < closest.distance ? { command: cmd, distance } : closest;
   }, { command: '', distance: Infinity }).command;
 }
-
+process.stdin.setEncoding('utf8');
 process.stdin.on('data', (data) => {
   const command = data.toString().trim();
   const [main, sub, arg, arg2] = command.split(' ');
-
   const availableCommands = [
     '# token edit',
     '# token delete',
@@ -215,7 +212,6 @@ process.stdin.on('data', (data) => {
     '#-dev shutdown',
     '#-dev help'
   ];
-
   if (main === '#') {
     if (sub === 're-toggle') {
       if (arg === 'true') toggleCommand('re-toggle', true);
@@ -262,5 +258,4 @@ process.stdin.on('data', (data) => {
     console.log(`[ERROR] ❌ Unknown command group. Did you mean "${closest}"?`);
   }
 });
-process.stdin.setEncoding('utf8');
 process.stdin.resume();
