@@ -14,7 +14,7 @@ function checkAndInstallModules(baseDir) {
 
     // Check for node_modules
     if (!fs.existsSync(nodeModulesPath)) {
-        console.log('[SYSTEM]📦 node_modules not found. Running npm install...');
+        console.log('[SYSTEM]📦 node_modules not found. Running npm install...\n npm install');
         try {
             execSync('npm install', { stdio: 'inherit', cwd: baseDir });
             console.log('[SYSTEM]✅ npm install completed');
