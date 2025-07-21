@@ -30,7 +30,7 @@ await moduleCHK.checkAndInstallModules(bcodePath);
 console.log('[STARTUP] 📝 Bcode Startup Script Online');
 
 // 🕐 Dynamically import TokenEditorUtility AFTER node_modules are available
-const { default: TokenEditorUtility } = await import('./Utility Module/TokenEditorUtility.js');
+const { default: TokenEditorUtility } = await import('./Utility Module/tokenEditorUtility.js');
 const tokenEditor = new TokenEditorUtility();
 
 // 🖥 OS Detection
@@ -256,7 +256,7 @@ process.stdin.on('data', (data) => {
       const closest = suggestClosestCommand(command, availableCommands.filter(cmd => cmd.startsWith('# ')));
       console.log(`[ERROR] ❌ Unknown command. Use "# help". Did you mean "${closest}"?`);
     }
-  } else if (main === '#-dev') {
+  } else if (main === '@') {
     if (sub === 'shutdown') shutdownProcess();
     else if (sub === 'help') {
       console.log('|      [DEV]');
