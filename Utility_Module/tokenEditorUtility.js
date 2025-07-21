@@ -66,5 +66,4 @@ class TokenEditorUtility {
     }
   }
 }
-
 export default TokenEditorUtility;
