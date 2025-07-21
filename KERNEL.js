@@ -118,13 +118,25 @@ async function startBot() {
 }
 
 const stopBot = () => {
-  console.log('[STARTUP] ✔️ Stopping bot...');
-  if (botPid) {
-    const command = process.platform === 'win32' ? `taskkill /F /PID ${botPid}` : `kill ${botPid}`;
+  console.log('[STARTUP] ✔️ Attempting to stop the bot...');
+
+  const currentPid = getBotPid(); // Dynamically fetch PID again
+
+  if (!currentPid) {
+    console.log('[STARTUP] ⚠️ Bot is not running or could not be detected.');
+    console.log('[STARTUP] ❌ Bot cannot be stopped because it wasn’t started.');
+    return;
+  }
+
+  const command = process.platform === 'win32'
+    ? `taskkill /F /PID ${currentPid}`
+    : `kill ${currentPid}`;
+
+  try {
     execSync(command);
-    console.log('[STARTUP] ✔️ Bot stopped successfully');
-  } else {
-    console.log('[STARTUP] Error: Bot PID not found');
+    console.log(`[STARTUP] ✔️ Bot with PID ${currentPid} stopped successfully.`);
+  } catch (err) {
+    console.log(`[STARTUP] ❌ Failed to stop bot with PID ${currentPid}: ${err.message}`);
   }
 
   const nodeModulesPath = path.join(bcodePath, 'node_modules');
