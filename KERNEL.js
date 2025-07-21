@@ -6,16 +6,16 @@ import fs from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
-import { checkBcodeStructure } from './Utility Module/KNchecksum.js';
+import { checkBcodeStructure } from './Utility_Module/KNchecksum.js';
 import moduleCHK from './Bcode/utils/moduleCHK.js';
-import startup from './Utility Module/CMDstartup.js';
+import startup from './Utility_Module/CMDstartup.js';
 import {
   bcodePath,
   tokenPath,
   cmdPath,
   commandsJsonPath
 } from './defined/path-define.js';
-import { toggleCommand, createCommandsJson } from './Utility Module/CMDtoggle.js';
+import { toggleCommand, createCommandsJson } from './Utility_Module/CMDtoggle.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -30,7 +30,7 @@ await moduleCHK.checkAndInstallModules(bcodePath);
 console.log('[STARTUP] 📝 Bcode Startup Script Online');
 
 // 🕐 Dynamically import TokenEditorUtility AFTER node_modules are available
-const { default: TokenEditorUtility } = await import('./Utility Module/tokenEditorUtility.js');
+const { default: TokenEditorUtility } = await import('./Utility_Module/tokenEditorUtility.js');
 const tokenEditor = new TokenEditorUtility();
 
 // 🖥 OS Detection
