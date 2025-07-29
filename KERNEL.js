@@ -1,36 +1,41 @@
-// KERNEL.js 
+//,,,,,,,,,,,,,
+// KERNEL.js |
+//````````````
 console.log('[STARTUP] Starting Bcode Startup Script...');
-
 import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
-import { checkBcodeStructure } from './Utility_Module/KNchecksum.js';
+import { checkBcodeStructure } from './Utility Module/KNchecksum.js';
 import moduleCHK from './Bcode/utils/moduleCHK.js';
-import startup from './Utility_Module/CMDstartup.js';
+import startup from './Utility Module/CMDstartup.js';
 import {
   bcodePath,
   tokenPath,
-  cmdPath,
   commandsJsonPath
 } from './defined/path-define.js';
-import { toggleCommand, createCommandsJson } from './Utility_Module/CMDtoggle.js';
+import { toggleCommand, createCommandsJson } from './Utility Module/CMDtoggle.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// ✅ Run structure check
 await checkBcodeStructure();
 console.log('[CHECK] ✔️ Bcode structure verified successfully!');
+console.log('[STARTUP] 📦 Installing root dependencies via npm...');
+try {
+  execSync('npm install', { cwd: __dirname, stdio: 'inherit' });
+  console.log('[STARTUP] ✔️ Root dependencies installed');
+} catch (err) {
+  console.error('[STARTUP] ❌ Failed to install root dependencies:', err.message);
+}
 
-// 📦 Ensure node_modules is installed before using packages like dotenv
 console.log('[STARTUP] 📝 Bcode Startup Script installing NODE_MODULES');
 await moduleCHK.checkAndInstallModules(bcodePath);
 console.log('[STARTUP] 📝 Bcode Startup Script Online');
 
 // 🕐 Dynamically import TokenEditorUtility AFTER node_modules are available
-const { default: TokenEditorUtility } = await import('./Utility_Module/tokenEditorUtility.js');
+const { default: TokenEditorUtility } = await import('./Utility Module/TokenEditorUtility.js');
 const tokenEditor = new TokenEditorUtility();
 
 // 🖥 OS Detection
@@ -76,9 +81,11 @@ const getBotPid = () => {
       console.error(`Unsupported operating system: ${os}`);
       return null;
   }
-};
+}
 
-let botPid;
+function clearPrompt() {
+  promptVisible = false;
+}
 
 const tokenExists = () => {
   try {
@@ -89,101 +96,67 @@ const tokenExists = () => {
   }
 };
 
-const editToken = (newToken) => {
-  const errorMessage = tokenEditor.editToken(newToken);
-  if (errorMessage) console.log(errorMessage);
-  else console.log('[STARTUP] ✔️ Token edited successfully');
+const editToken = () => {
+  inputLocked = true;
+  tokenEditor.editTokenInteractive(() => {
+    inputLocked = false;
+    showPrompt(true);
+  });
 };
 
 const deleteToken = () => {
   tokenEditor.deleteToken();
   console.log('[STARTUP] ✔️ Token deleted successfully');
-  console.log('[STARTUP] 🚨 Please create a new token using the command:\n "# token save <TOKEN>"');
+  console.log('[STARTUP] 🚨 Please create a new token.');
+  showPrompt(true);
 };
 
-const saveToken = (token) => {
-  const errorMessage = tokenEditor.validateToken(token);
-  if (errorMessage) console.log(errorMessage);
-  else {
-    tokenEditor.saveToken(token);
-    console.log('[STARTUP] Token saved successfully');
-  }
+const saveToken = () => {
+  inputLocked = true;
+  tokenEditor.saveTokenInteractive(() => {
+    inputLocked = false;
+    showPrompt(true);
+  });
 };
 
-async function startBot() {
-  await startup();
-  const commandLoader = new CommandLoader();
-  await commandLoader.loadCommands();
-  const commandManager = new CommandManager(commandLoader);
-}
-
-const stopBot = () => {
-  console.log('[STARTUP] ✔️ Attempting to stop the bot...');
-
-  const currentPid = getBotPid(); // Dynamically fetch PID again
-
-  if (!currentPid) {
-    console.log('[STARTUP] ⚠️ Bot is not running or could not be detected.');
-    console.log('[STARTUP] ❌ Bot cannot be stopped because it wasn’t started.');
-    return;
-  }
-
-  const command = process.platform === 'win32'
-    ? `taskkill /F /PID ${currentPid}`
-    : `kill ${currentPid}`;
-
-  try {
-    execSync(command);
-    console.log(`[STARTUP] ✔️ Bot with PID ${currentPid} stopped successfully.`);
-  } catch (err) {
-    console.log(`[STARTUP] ❌ Failed to stop bot with PID ${currentPid}: ${err.message}`);
-  }
-
-  const nodeModulesPath = path.join(bcodePath, 'node_modules');
-  if (fs.existsSync(nodeModulesPath)) {
-    console.log('[STARTUP] 🗑 Deleting node_modules folder...');
-    fs.rmSync(nodeModulesPath, { recursive: true, force: true });
-    console.log('[STARTUP] ✔️ node_modules folder deleted successfully');
-  } else {
-    console.log('[STARTUP] No node_modules folder found.');
-  }
-};
-
-const restartBot = () => {
+const restartBot = async () => {
   const command = process.platform === 'win32' ? 'tasklist /FI "IMAGENAME eq node.exe"' : `pidof node`;
-  const output = execSync(command).toString();
-  if (output.trim() !== '') {
-    console.log('[RESTART] 🚀 Bot is online, stopping and restarting...');
-    stopBot();
-    setTimeout(startBot, 1000);
-    console.log('[RESTART] ✔️ Bot restarted successfully');
-  } else {
-    console.log('[RESTART] Bot is offline, starting...');
-    startBot();
+  try {
+    const output = execSync(command).toString();
+    if (output.trim() !== '') {
+      console.log('[RESTART] 🚀 Bot is online, stopping and restarting...');
+      await CMDstop({ restart: true });
+      setTimeout(() => CMDstart(), 1000);
+      console.log('[RESTART] ✔️ Bot restarted successfully');
+    } else {
+      console.log('[RESTART] Bot is offline, starting...');
+      CMDstart();
+    }
+  } catch (err) {
+    console.error(`[RESTART] ❌ Failed to restart bot: ${err.message}`);
   }
+  showPrompt(true);
 };
+
 if (!tokenExists()) {
-  console.log('[STARTUP] 🚨 No token found, please create one using the command:');
-  console.log('  # token save <token>');
+  console.log('[STARTUP] 🚨 No token found. Prompting user to create one...');
+  const token = await tokenEditor.saveTokenInteractive();
+  if (!token) {
+    console.log('[STARTUP] ⚠️ Continuing without bot startup. Other modules still functional.');
+  }
+} else {
+  console.log('[STARTUP] ✔️ Token found. Use "# start" to launch the bot.');
 }
-const shutdownProcess = () => {
+
+showPrompt(true);
+
+const shutdownProcess = async () => {
   console.log('[STARTUP] ⛔️ Shutting down process...');
-  if (botPid) {
-    const command = process.platform === 'win32' ? `taskkill /F /PID ${botPid}` : `kill ${botPid}`;
-    execSync(command);
-    console.log('[STARTUP] ✔️ Bot stopped successfully');
-  }
-  const nodeModulesPath = path.join(bcodePath, 'node_modules');
-  if (fs.existsSync(nodeModulesPath)) {
-    console.log('[STARTUP] 🗑 Deleting node_modules folder...');
-    fs.rmSync(nodeModulesPath, { recursive: true, force: true });
-    console.log('[STARTUP] ✔️ node_modules folder deleted successfully');
-  } else {
-    console.log('[STARTUP] ✔️ No node_modules folder found. Shutting down process...');
-  }
+  await CMDstop({ shutdown: true });
   console.log('[STARTUP] ✔️ shutting down...');
   process.exit(0);
 };
+
 function suggestClosestCommand(command, availableCommands) {
   const levenshtein = (a, b) => {
     const an = a.length, bn = b.length;
@@ -196,41 +169,61 @@ function suggestClosestCommand(command, availableCommands) {
     for (let i = 1; i <= an; i++) {
       for (let j = 1; j <= bn; j++) {
         const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-        matrix[i][j] = Math.min(matrix[i - 1][j] + 1, matrix[i][j - 1] + 1, matrix[i - 1][j - 1] + cost);
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + cost
+        );
       }
     }
     return matrix[an][bn];
   };
-  return availableCommands.reduce((closest, cmd) => {
-    const distance = levenshtein(command, cmd);
-    return distance < closest.distance ? { command: cmd, distance } : closest;
-  }, { command: '', distance: Infinity }).command;
+
+  return availableCommands.reduce(
+    (closest, cmd) => {
+      const distance = levenshtein(command, cmd);
+      return distance < closest.distance
+        ? { command: cmd, distance }
+        : closest;
+    },
+    { command: '', distance: Infinity }
+  ).command;
 }
+
+function handleInvalidCommand(scope, input, validList, usage) {
+  const suggestion = suggestClosestCommand(input || '', validList);
+  console.log(`[${scope.toUpperCase()}] ❌ Unknown ${scope}: "${input || 'none'}"`);
+  if (suggestion && suggestion !== input) {
+    console.log(`[${scope.toUpperCase()}] 🤔 Did you mean: ${usage.replace('<CMD>', suggestion)}?`);
+  } else {
+    console.log(`[${scope.toUpperCase()}] Usage: ${usage.replace('<CMD>', scope)}`);
+  }
+  showPrompt(true);
+}
+
 process.stdin.setEncoding('utf8');
-process.stdin.on('data', (data) => {
+process.stdin.on('data', async (data) => {
+  if (inputLocked) return;
+
+  clearPrompt();
   const command = data.toString().trim();
-  const [main, sub, arg, arg2] = command.split(' ');
-  const availableCommands = [
-    '# token edit',
-    '# token delete',
-    '# token save',
-    '# token help',
-    '# re-toggle true',
-    '# re-toggle false',
-    '# start',
-    '# stop',
-    '# restart',
-    '# help',
-    '#-dev shutdown',
-    '#-dev help'
-  ];
+  const [main, sub, arg, arg2, arg3] = command.split(' ');
+
   if (main === '#') {
-    if (sub === 're-toggle') {
-      if (arg === 'true') toggleCommand('re-toggle', true);
-      else if (arg === 'false') toggleCommand('re-toggle', false);
-      else console.log('[ERROR] ❌ Invalid argument for re-toggle. Use "true" or "false".');
-    } else if (sub === 'token') {
-      if (arg === 'edit') editToken(arg2);
+    const mainCommands = ['token', 'toggle', 'start', 'stop', 'restart', 'help'];
+    if (!mainCommands.includes(sub)) {
+      handleInvalidCommand('#', sub, mainCommands, '# <CMD>');
+      return;
+    }
+
+    if (sub === 'token') {
+      const tokenSubcommands = ['edit', 'save', 'delete'];
+      if (!tokenSubcommands.includes(arg)) {
+        handleInvalidCommand('token', arg, tokenSubcommands, '# token <edit|save|delete>');
+        return;
+      }
+      if (arg === 'edit') editToken();
+      else if (arg === 'save') saveToken();
       else if (arg === 'delete') deleteToken();
       else if (arg === 'save') saveToken(arg2);
       else if (arg === 'help') {
@@ -256,7 +249,7 @@ process.stdin.on('data', (data) => {
       const closest = suggestClosestCommand(command, availableCommands.filter(cmd => cmd.startsWith('# ')));
       console.log(`[ERROR] ❌ Unknown command. Use "# help". Did you mean "${closest}"?`);
     }
-  } else if (main === '@') {
+  } else if (main === '#-dev') {
     if (sub === 'shutdown') shutdownProcess();
     else if (sub === 'help') {
       console.log('|      [DEV]');
@@ -266,8 +259,16 @@ process.stdin.on('data', (data) => {
       console.log(`[ERROR] ❌ Unknown dev command. Use "#-dev help". Did you mean "${closest}"?`);
     }
   } else {
-    const closest = suggestClosestCommand(main, ['#', '#-dev']);
-    console.log(`[ERROR] ❌ Unknown command group. Did you mean "${closest}"?`);
+    console.log(`[INPUT] ❌ Invalid input: "${command}"`);
+    console.log(`[INPUT] 💡 Hint: Commands must begin with '#' or '@'`);
   }
+
+  showPrompt(true);
 });
+
 process.stdin.resume();
+showPrompt(true);
+
+//,,,,,,,,,,,,,,,,,
+//END OF KERNEL.js |
+//````````````

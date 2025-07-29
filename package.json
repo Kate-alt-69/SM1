@@ -3,13 +3,10 @@
   "version": "1.0.0",
   "description": "Discord Server Management Application",
   "main": "index.js",
-  "scripts": {
-    "start": "neu run",
-    "build": "neu build",
-    "dev": "neu run --frontend-lib-dev"
-  },
+  "scripts": {},
   "dependencies": {
-    "xterm": "^5.3.0"
+    "xterm": "^5.3.0",
+    "ps-tree": "^1.2.0"
   },
   "author": "",
   "license": "MIT"

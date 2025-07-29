@@ -1,5 +1,8 @@
+// CommandManager.js
 const fs = require('fs').promises;
 const path = require('path');
+const { checkCommandState } = require('./CommandExcutor');
+const { CommandLoader } = require('./CommandLoader');
 
 class CommandManager {
     constructor(client) {
@@ -11,7 +14,8 @@ class CommandManager {
             subCommands: 0,
             subCommandGroups: 0,
             failedCommands: 0,
-            skippedFiles: 0
+            skippedFiles: 0,
+            disabledCommands: 0
         };
         this.commandsPath = path.join(__dirname, '../commands');
         this.isRegistering = false;
@@ -21,29 +25,37 @@ class CommandManager {
     async loadCommands() {
         try {
             console.log('[SYSTEM] 📝 Loading commands...');
-            console.log('[SYSTEM] 🔄 Loading commands...');
-            
+            console.log('[SYSTEM] 🔄 Scanning command files...');
+
             const files = await fs.readdir(this.commandsPath);
-            let validFiles = 0;
-            
+
             for (const file of files) {
                 if (!file.endsWith('.js')) continue;
-                
+
                 try {
                     const filePath = path.join(this.commandsPath, file);
                     delete require.cache[require.resolve(filePath)];
                     const command = require(filePath);
-                    
+
                     if (command.data?.name && command.execute) {
-                        validFiles++;
-                        // Count main command
+                        const parent = command.data.name;
+                        const sub = parent;
+
+                        const state = checkCommandState({ parent, full: sub });
+
+                        // ONLY skip if state is FALSE or contains disable code
+                        if (state && state.disabled === true) {
+                            console.warn(`[COMMAND.DISABLED] ⛔ Skipped "${sub}": ${state.code}`);
+                            this.stats.disabledCommands++;
+                            continue;
+                        }
+
                         this.stats.mainCommands++;
-                        
-                        // Count subcommands if they exist
+
                         if (command.data.options) {
                             command.data.options.forEach(opt => {
-                                if (opt.type === 1) this.stats.subCommands++; // Subcommand
-                                if (opt.type === 2) { // Subcommand group
+                                if (opt.type === 1) this.stats.subCommands++;
+                                if (opt.type === 2) {
                                     this.stats.subCommandGroups++;
                                     opt.options?.forEach(subOpt => {
                                         if (subOpt.type === 1) this.stats.subCommands++;
@@ -52,40 +64,37 @@ class CommandManager {
                             });
                         }
 
-                        this.commands.set(command.data.name, command);
-                        console.log(`[SYSTEM] ✅ Loaded command: ${command.data.name}`);
+                        this.commands.set(parent, command);
+                        console.log(`[SYSTEM] ✅ Loaded command: ${parent}`);
                     } else {
-                        console.warn(`{ERROR}⚠️ Invalid command structure in ${file}`);
+                        console.warn(`{ERROR} ⚠️ Invalid command structure in ${file}`);
                         this.stats.skippedFiles++;
                     }
                 } catch (error) {
-                    console.error(`{FILE.ERROR}❌ Failed to load ${file}:`, error.message);
+                    console.error(`{FILE.ERROR} ❌ Failed to load ${file}:`, error.message);
                     this.stats.failedCommands++;
 
-                    // Use CommandLoader to get detailed error information
                     const commandLoader = new CommandLoader(this);
                     const detailedError = await commandLoader.getDetailedError(file, error);
                     console.error(detailedError);
                 }
             }
 
-            // Calculate total commands
             this.stats.totalCommands = this.stats.mainCommands + this.stats.subCommands;
 
-            // Print loading stats
             console.log('[SYSTEM]\n📊 Command loading complete:');
             console.log(`            ✅ Loaded: ${this.stats.totalCommands} (${this.stats.mainCommands} main, ${this.stats.subCommands} sub)`);
+            console.log(`            ⛔ Disabled: ${this.stats.disabledCommands}`);
             console.log(`            ❌ Failed: ${this.stats.failedCommands}`);
             console.log(`            ⏭️ Skipped: ${this.stats.skippedFiles}\n`);
 
-            // Register commands only once
             return await this.registerCommands();
         } catch (error) {
             console.error('{ERROR} ❌ Failed to load commands:', error);
             return false;
         }
     }
-  
+
     async registerCommands() {
         if (this.isRegistering) return;
         this.isRegistering = true;
@@ -95,8 +104,7 @@ class CommandManager {
             const commands = [...this.commands.values()].map(cmd => cmd.data.toJSON());
             await this.client.application?.commands.set(commands);
             console.log(`[SYSTEM] ✅ Registered ${commands.length} commands globally`);
-            
-            // Update bot stats safely
+
             if (this.client) {
                 this.client.botStats = {
                     commands: this.stats.totalCommands,

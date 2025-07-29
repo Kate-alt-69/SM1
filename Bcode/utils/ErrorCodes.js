@@ -24,7 +24,7 @@ const ErrorMessages = {
     [ErrorCodes.EMBED_EDIT_FAILED]: 'Failed to edit embed. Please try again.',
     [ErrorCodes.EMBED_SEND_FAILED]: 'Failed to send embed. Please check channel permissions.',
     [ErrorCodes.PERMISSION_DENIED]: 'You don\'t have permission to use this command.',
-    [ErrorCodes.COMMAND_DISABLED]: 'This command is currently disabled.',
+    [ErrorCodes.COMMAND_DISABLED]: 'This command is currently disabled.\n Please Contact the Host to Turn it ON',
     [ErrorCodes.COMMAND_COOLDOWN]: 'Please wait before using this command again.',
     [ErrorCodes.INVALID_CHANNEL]: 'This command cannot be used in this channel.',
     [ErrorCodes.INVALID_PERMISSIONS]: 'You need additional permissions to use this command.',

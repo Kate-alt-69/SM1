@@ -1,0 +1,33 @@
+permissions:
+  contents: read
+name: Deploy Discord Bot
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+        
+    - name: Install dependencies
+      run: cd Bcode
+        npm install
+        
+    - name: Create .env file
+      run: |
+        echo "TOKEN_SM=${{ secrets.TOKEN_SM }}" > .env
+      
+    - name: Run bot
+      run: node Bcode/DCB.js

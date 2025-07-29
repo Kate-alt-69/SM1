@@ -1,4 +1,3 @@
-process.title = 'DISCORDSERVERMANAGER';
 const path = require('path');
 require('./utils/moduleCHK').checkAndInstallModules(__dirname);
 const { Client, GatewayIntentBits, ActivityType, Collection } = require('discord.js');

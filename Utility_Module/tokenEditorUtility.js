@@ -1,16 +1,24 @@
+// tokenEditorUtility.js
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { spawn } from 'child_process';
 import { bcodePath } from '../defined/path-define.js';
 import { TokenManager } from '../Bcode/utils/TokenManager.js';
-
+import OSCommandHelper from './OScmd.js';
+import { getUserInputDynamic } from './Prompt.js'; // ✅ imported your dynamic prompt
 // __dirname polyfill for ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 class TokenEditorUtility {
-  constructor() {
+  constructor(setInputLockCallback) {
     this.tokenManager = new TokenManager();
+    this.unlockInput = setInputLockCallback;
+    this.osHelper = new OSCommandHelper();
+
+    console.log(this.osHelper.getInfoMessage());
+    console.log(this.osHelper.getShellUsageNote());
   }
 
   isValidTokenFormat(token) {
@@ -22,19 +30,55 @@ class TokenEditorUtility {
     return discordTokenRegex.test(token);
   }
 
-  saveToken(token) {
-    return this.tokenManager.saveToken(token);
-  }
+  async saveTokenInteractive() {
+  try {
+    const defaultValue = ''; // Or load previous token from JSON if needed
+    const token = await getUserInputDynamic('Enter new Discord Bot Token', defaultValue);
 
-  editToken(newToken) {
-    const errorMessage = this.validateToken(newToken);
-    if (errorMessage) {
-      console.log(errorMessage);
-      return false;
+    this.unlockInput();
+
+    if (!token || !token.trim()) {
+      console.log('[TOKEN] ⚠️ No token provided or user cancelled. Startup continues.');
+      return null;
     }
-    return this.tokenManager.editToken(newToken);
-  }
 
+    await this.tokenManager.saveToken(token);
+    console.log('[TOKEN] 💾 Token saved successfully.');
+    return token;
+  } catch (err) {
+    console.error('[TOKEN] ❌ Unexpected error during token save:', err);
+    this.unlockInput();
+    return null;
+  }
+}
+
+  async editTokenInteractive() {
+  try {
+    const currentToken = await this.tokenManager.loadFromJson();
+    const token = await getUserInputDynamic('Edit Discord Token', currentToken || '');
+
+    this.unlockInput();
+
+    if (!token || !token.trim()) {
+      console.log('[TOKEN] ⚠️ Token edit aborted or no data entered.');
+      return null;
+    }
+
+    const errorMessage = this.validateToken(token);
+    if (errorMessage) {
+      console.log(`[TOKEN] ❌ ${errorMessage}`);
+      return null;
+    }
+
+    await this.tokenManager.saveToken(token);
+    console.log('[TOKEN] ✅ Token edited and saved successfully.');
+    return token;
+  } catch (err) {
+    console.error('Unexpected error during token edit:', err);
+    this.unlockInput();
+    return null;
+  }
+}
   validateToken(token) {
     if (!this.isValidTokenFormat(token)) {
       return 'Error: ⛔️ Invalid token format. Please use a valid token format.';
