@@ -24,6 +24,8 @@ DEBUGGER=true
 - **utils** folder for saving Module like Code assest's
 - Start Up Logging
 - Command Excution Loging and/or Easier Debug
+- Dynamicly Starting up Command Files
+  - how to Create (UPCOMING...)
 
 ## Upcoming*
 **!!These Features Maybe Still Coming (and/or i forgot to edit the README.md)!!**
@@ -35,6 +37,7 @@ DEBUGGER=true
 - More Kernel Commands
 - Commands Toggle (on/off)
 - More bot Commands
+- Multi OS (Operating System) Support (it's hard)
 
 ## About K8 (me)
 So. where ware we.. oh yeah i was talking to you about why did i create this project lets talk about how. <br>
