@@ -1,24 +1,16 @@
-// tokenEditorUtility.js with child process integration
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
 import { bcodePath } from '../defined/path-define.js';
 import { TokenManager } from '../Bcode/utils/TokenManager.js';
-import OSCommandHelper from './OScmd.js';
 
 // __dirname polyfill for ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 class TokenEditorUtility {
-  constructor(setInputLockCallback) {
+  constructor() {
     this.tokenManager = new TokenManager();
-    this.unlockInput = setInputLockCallback;
-    this.osHelper = new OSCommandHelper();
-
-    console.log(this.osHelper.getInfoMessage());
-    console.log(this.osHelper.getShellUsageNote());
   }
 
   isValidTokenFormat(token) {
@@ -30,60 +22,17 @@ class TokenEditorUtility {
     return discordTokenRegex.test(token);
   }
 
-  async saveTokenInteractive() {
-    return new Promise((resolve) => {
-      const promptScriptPath = path.join(__dirname, 'tokenPrompt.js');
-      const child = spawn('node', [promptScriptPath], {
-        stdio: ['inherit', 'pipe', 'inherit']
-      });
-
-      let tokenData = '';
-
-      child.stdout.on('data', (data) => {
-        tokenData += data.toString();
-      });
-
-      child.on('exit', (code) => {
-        this.unlockInput();
-        if (code === 0 && tokenData.trim()) {
-          const token = tokenData.trim();
-          this.tokenManager.saveToken(token);
-          console.log('[TOKEN] 💾 Token saved successfully.');
-          resolve(token);
-        } else {
-          console.log('[TOKEN] ⚠️ No token provided or user cancelled. Startup continues.');
-          resolve(null);
-        }
-      });
-    });
+  saveToken(token) {
+    return this.tokenManager.saveToken(token);
   }
 
-  editTokenInteractive() {
-    // You can optionally switch this to a child process too
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
-    });
-
-    rl.question('✏️ Enter the new token (or type "cancel" to abort): ', (newToken) => {
-      if (newToken.toLowerCase() === 'cancel' || newToken.trim() === '# cancel') {
-        console.log('[TOKEN] ❌ Token edit cancelled by user.');
-        rl.close();
-        this.unlockInput();
-        return;
-      }
-      const errorMessage = this.validateToken(newToken);
-      if (errorMessage) {
-        console.log(errorMessage);
-        rl.close();
-        this.unlockInput();
-        return;
-      }
-      this.tokenManager.editToken(newToken);
-      console.log('[TOKEN] ✅ Token edited successfully.');
-      rl.close();
-      this.unlockInput();
-    });
+  editToken(newToken) {
+    const errorMessage = this.validateToken(newToken);
+    if (errorMessage) {
+      console.log(errorMessage);
+      return false;
+    }
+    return this.tokenManager.editToken(newToken);
   }
 
   validateToken(token) {
