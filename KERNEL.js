@@ -6,16 +6,18 @@ import path from 'path';
 import fs from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
-
-import { checkBcodeStructure } from './Utility Module/KNchecksum.js';
+import { checkBcodeStructure } from './Utility_Module/KNchecksum.js';
 import moduleCHK from './Bcode/utils/moduleCHK.js';
-import startup from './Utility Module/CMDstartup.js';
+import startup from './Utility_Module/CMDstartup.js';
+import CMDstart from './Utility_Module/CMDstart.js';
+import CMDstop from './Utility_Module/CMDstop.js';
 import {
   bcodePath,
   tokenPath,
-  commandsJsonPath
+  cmdPath,
+  commandsJsonPath,
+  cmdSnapshotPath
 } from './defined/path-define.js';
-import { toggleCommand, createCommandsJson } from './Utility Module/CMDtoggle.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,52 +36,27 @@ console.log('[STARTUP] 📝 Bcode Startup Script installing NODE_MODULES');
 await moduleCHK.checkAndInstallModules(bcodePath);
 console.log('[STARTUP] 📝 Bcode Startup Script Online');
 
-// 🕐 Dynamically import TokenEditorUtility AFTER node_modules are available
-const { default: TokenEditorUtility } = await import('./Utility Module/TokenEditorUtility.js');
-const tokenEditor = new TokenEditorUtility();
+const pidPath = path.resolve('./Utility_Module/PID.json');
+if (!fs.existsSync(pidPath)) {
+  fs.writeFileSync(pidPath, JSON.stringify({ START: 'DISCORDSERVERMANAGER', PID: null, botrunning: false }, null, 2));
+}
 
-// 🖥 OS Detection
-const getOS = () => {
-  switch (process.platform) {
-    case 'win32': return 'Windows';
-    case 'darwin': return 'macOS';
-    case 'linux': return 'Linux';
-    default: return 'Unknown';
-  }
-};
+if (!fs.existsSync(commandsJsonPath)) {
+  console.log('[CMD] ⛏ No commands.json file found. Generating default config...');
+  const { default: ToggleManager } = await import('./Utility_Module/FUNCTtoggle.js');
+  ToggleManager.regenerateCommandJson();
+}
 
-console.log(`Operating System: ${getOS()}`);
+const { default: TokenEditorUtility } = await import('./Utility_Module/tokenEditorUtility.js');
+const tokenEditor = new TokenEditorUtility(() => (inputLocked = false));
 
-// 🔍 Windows-specific PID checker
-const getPidFromTasklist = (command) => {
-  const output = execSync(command).toString();
-  const regex = /node.exe\s+(\d+)/g;
-  let match;
-  while ((match = regex.exec(output)) !== null) {
-    if (output.includes('DISCORDSERVERMANAGER')) return match[1];
-  }
-  return null;
-};
-const getPidFromPs = (command) => {
-  const output = execSync(command).toString();
-  const regex = /node\s+(\d+)/g;
-  let match;
-  while ((match = regex.exec(output)) !== null) {
-    if (output.includes('DISCORDSERVERMANAGER')) return match[1];
-  }
-  return null;
-};
+let inputLocked = false;
+let promptVisible = false;
 
-const getBotPid = () => {
-  const os = getOS();
-  let command;
-  switch (os) {
-    case 'Windows': command = 'tasklist'; return getPidFromTasklist(command);
-    case 'macOS':
-    case 'Linux': command = 'ps -ef'; return getPidFromPs(command);
-    default:
-      console.error(`Unsupported operating system: ${os}`);
-      return null;
+function showPrompt(force = false) {
+  if (!promptVisible || force) {
+    process.stdout.write('<<-');
+    promptVisible = true;
   }
 }
 
@@ -225,39 +202,66 @@ process.stdin.on('data', async (data) => {
       if (arg === 'edit') editToken();
       else if (arg === 'save') saveToken();
       else if (arg === 'delete') deleteToken();
-      else if (arg === 'save') saveToken(arg2);
-      else if (arg === 'help') {
-        console.log('|        [TOKEN]');
-        console.log('|  # token edit <token>  |- Edit the token in system');
-        console.log('|  # token delete        |- Delete the token from system');
-        console.log('|  # token save <token>  |- Save the token to system');
-      } else {
-        const closest = suggestClosestCommand(command, availableCommands.filter(cmd => cmd.startsWith('# token')));
-        console.log(`[ERROR] ❌ Invalid token command. Use "# token help". Did you mean "${closest}"?`);
-      }
-    } else if (sub === 'start') startBot();
-    else if (sub === 'stop') stopBot();
-    else if (sub === 'restart') restartBot();
-    else if (sub === 'help') {
-      console.log('|    [COMMANDS]');
-      console.log('|  # token              |- Use "# token help"');
-      console.log('|  # re-toggle <true|false> |- Toggle feature');
-      console.log('|  # start              |- Start the Bot');
-      console.log('|  # stop               |- Stop the Bot');
-      console.log('|  # restart            |- Restart the Bot');
-    } else {
-      const closest = suggestClosestCommand(command, availableCommands.filter(cmd => cmd.startsWith('# ')));
-      console.log(`[ERROR] ❌ Unknown command. Use "# help". Did you mean "${closest}"?`);
+
+    } else if (sub === 'toggle') {
+      const ToggleManager = (await import('./Utility_Module/FUNCTtoggle.js')).default;
+
+      if (arg === 'list') ToggleManager.listTogglableCommands();
+      else if (arg === 'on') ToggleManager.enableCommand(arg2);
+      else if (arg === 'off') ToggleManager.disableCommand(arg2);
+      else if (arg === 'update') ToggleManager.regenerateCommandJson();
+      else if (arg === 'cleanup') ToggleManager.deleteSnapshots();
+      else if (arg === 'snapshot') ToggleManager.takeSnapshot();
+      else if (arg === 'rollback' && arg2 === 'list') ToggleManager.listSnapshots();
+      else if (arg === 'rollback' && arg2) ToggleManager.rollbackSnapshot(arg2);
+      else if (arg === 'help') ToggleManager.toggleHelp();
+      else handleInvalidCommand('toggle', arg, ['list', 'on', 'off', 'update', 'cleanup', 'snapshot', 'rollback', 'help'], '# toggle <CMD>');
+
+    } else if (sub === 'start') {
+      await CMDstart();
+
+    } else if (sub === 'stop') {
+      await CMDstop({ stop: true });
+      console.log('[STOP] 🛑 Bot stopped successfully');
+
+    } else if (sub === 'restart') {
+      await restartBot();
+
+    } else if (sub === 'help') {
+      console.log('\n# HELP — List of Available Commands');
+      console.log('===========================================================================');
+      console.log('\n[#] Main Bot Control Commands:');
+      console.log('  # start           → Starts the bot using the saved token.');
+      console.log('  # stop            → Stops the bot gracefully. No effect if not running.');
+      console.log('  # restart         → Restarts the bot. Starts it if offline.');
+      console.log('  # help            → Shows this help message with command descriptions.\n');
+
+      console.log('[# token] Token Management Commands:');
+      console.log('  # token edit      → Opens prompt to edit and update the bot token.');
+      console.log('  # token save      → Opens prompt to enter and save a new bot token.');
+      console.log('  # token delete    → Deletes the current saved token permanently.\n');
+
+      console.log('[# toggle] Command Toggle Control:');
+      console.log('  # toggle <command> [scope] [value]');
+      console.log('                   → Enables or disables a command globally or locally.\n');
+
+      console.log('[@] System-Level Commands:');
+      console.log('  @ shutdown        → Terminates the entire CLI interface and exits process.\n');
+
+      console.log('===========================================================================');
     }
-  } else if (main === '#-dev') {
-    if (sub === 'shutdown') shutdownProcess();
-    else if (sub === 'help') {
-      console.log('|      [DEV]');
-      console.log('|  #-dev shutdown   |- Shutdown the process and stop the bot');
-    } else {
-      const closest = suggestClosestCommand(command, availableCommands.filter(cmd => cmd.startsWith('#-dev ')));
-      console.log(`[ERROR] ❌ Unknown dev command. Use "#-dev help". Did you mean "${closest}"?`);
+
+  } else if (main === '@') {
+    const systemCommands = ['shutdown'];
+    if (!systemCommands.includes(sub)) {
+      handleInvalidCommand('@', sub, systemCommands, '@ shutdown');
+      return;
     }
+
+    if (sub === 'shutdown') {
+      await shutdownProcess();
+    }
+
   } else {
     console.log(`[INPUT] ❌ Invalid input: "${command}"`);
     console.log(`[INPUT] 💡 Hint: Commands must begin with '#' or '@'`);
@@ -271,4 +275,4 @@ showPrompt(true);
 
 //,,,,,,,,,,,,,,,,,
 //END OF KERNEL.js |
-//````````````
+//```````````````
