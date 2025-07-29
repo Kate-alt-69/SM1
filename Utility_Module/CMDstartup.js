@@ -1,4 +1,4 @@
-import { createCommandsJson } from './CMDtoggle.js';
+import { createCommandsJson } from './FUNCTtoggle.js';
 import { bcodePath } from '../defined/path-define.js';
 import fs from 'fs';
 import path from 'path';

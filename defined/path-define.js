@@ -1,3 +1,7 @@
+//````````````````````|
+//START PATH-DEFINE.js|
+//,,,,,,,,,,,,,,,,,,,,|
+
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -15,7 +19,11 @@ const cmdPath = path.join(bcodePath, 'commands');
 const configPath = path.join(bcodePath, 'config');
 const tokenPath = path.join(configPath, 'token.json');
 const commandsJsonPath = path.join(configPath, 'commands.json');
-
+const dcbPathPath = path.join(bcodePath, 'DCB.js');
+const utilsEmbedPath = path.join(utilsPath, 'embed');
+const cmdSnapshotPath = path.join(configPath, 'cmd_snapshots');
+const cmandEmbedPath = path.join(cmdPath, 'embeded');
+const cmandStickyPath = path.join(cmdPath, 'sticky');
 export {
   bcodePath,
   configPath,
@@ -27,4 +35,13 @@ export {
   cmdPath,
   tokenPath,
   moduleCHKpath,
+  dcbPathPath,
+  utilsEmbedPath,
+  cmdSnapshotPath,
+  cmandEmbedPath,
+  cmandStickyPath
 };
+
+//,,,,,,,,,,,,,,,,,,,,,,|
+// END OF PATH-DEFINE.js|
+//``````````````````````|
