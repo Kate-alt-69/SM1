@@ -1,45 +1,21 @@
 {
-  "about": {
-    "about": true
-  },
-  "console": {
-    "console.report": true,
-    "console.tell": true,
-    "console.runtime": true
-  },
-  "embed": {
-    "embed.create": true,
-    "embed.send": true
-  },
-  "emojitest": {
-    "emojitest": true
-  },
-  "fun": {
-    "fun.8ball": true,
-    "fun.flip": true,
-    "fun.roll": true
-  },
-  "help": {
-    "help": true
-  },
-  "kick": {
-    "kick": true
-  },
-  "ping": {
-    "ping": true
-  },
-  "create": {
-    "create.question": true
-  },
-  "role": {
-    "role.add": true,
-    "role.remove": true
-  },
-  "sticky": {
-    "sticky": true
-  },
-  "utility": {
-    "utility.ping": true,
-    "utility.about": true
-  }
+  "about": false,
+  "console.report": true,
+  "console.tell": true,
+  "console.runtime": true,
+  "embed.create": true,
+  "embed.send": true,
+  "emojitest": true,
+  "fun.8ball": true,
+  "fun.flip": true,
+  "fun.roll": true,
+  "help": true,
+  "kick": true,
+  "ping": true,
+  "create.question": true,
+  "role.add": true,
+  "role.remove": true,
+  "sticky": true,
+  "utility.ping": true,
+  "utility.about": true
 }
