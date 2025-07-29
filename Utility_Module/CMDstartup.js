@@ -1,4 +1,6 @@
-import { createCommandsJson } from './FUNCTtoggle.js';
+//,,,,,,,,,,,,,
+// CMDstartup.js |
+//``````````````
 import { bcodePath } from '../defined/path-define.js';
 import fs from 'fs';
 import path from 'path';
@@ -20,8 +22,12 @@ async function startup() {
     return;
   }
 
-  await createCommandsJson();
+  const { default: ToggleManager } = await import('./FUNCTtoggle.js');
+  ToggleManager.regenerateCommandJson();
   console.log('[STARTUP] ✅ commands.json file generated successfully!');
 }
 
 export default startup;
+//,,,,,,,,,,,,,,,,,
+// END OF CMDstartup.js |
+//`````````````````````

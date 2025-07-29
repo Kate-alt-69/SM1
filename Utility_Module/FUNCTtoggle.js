@@ -76,9 +76,10 @@ class CommandToggleManager {
   static toggleCommand(commandName) {
     const commandsJson = JSON.parse(fs.readFileSync(commandsJsonPath, 'utf8'));
 
-    if (commandsJson[commandName]) {
-      commandsJson[commandName] = false;
-      console.log(`[CMD] ❌ Command "${commandName}" disabled.`);
+    if (commandsJson.hasOwnProperty(commandName)) {
+      commandsJson[commandName] = !commandsJson[commandName];
+      const status = commandsJson[commandName] ? 'enabled' : 'disabled';
+      console.log(`[CMD] ${status === 'enabled' ? '✅' : '❌'} Command "${commandName}" ${status}.`);
     } else {
       commandsJson[commandName] = true;
       console.log(`[CMD] ✅ Command "${commandName}" enabled.`);
@@ -124,13 +125,13 @@ class CommandToggleManager {
 
   static disableCommand(name) {
     const commandsJson = JSON.parse(fs.readFileSync(commandsJsonPath, 'utf8'));
-    if (commandsJson[name] !== undefined) {
+    if (commandsJson.hasOwnProperty(name)) {
       commandsJson[name] = false;
+      fs.writeFileSync(commandsJsonPath, JSON.stringify(commandsJson, null, 2));
+      console.log(`[CMD] ❌ Command "${name}" disabled.`);
     } else {
-      console.log(`[CMD] ⚠️ Command "${name}" does not exist in commands.json`);
+      console.log(`[CMD] ⚠️ Command "${name}" not found.`);
     }
-    fs.writeFileSync(commandsJsonPath, JSON.stringify(commandsJson, null, 2));
-    console.log(`[CMD] ❌ Command "${name}" disabled.`);
   }
 
   static regenerateCommandJson() {
