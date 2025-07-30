@@ -3,5 +3,6 @@
   "PID": 106093,
   "TIMESTAMP": "2025-07-29T17:49:00.531Z",
   "FILE": "/workspaces/SM1/Bcode/DCB.js",
-  "botrunning": false
+  "botrunning": true,
+  "kernelpid": 79343
 }

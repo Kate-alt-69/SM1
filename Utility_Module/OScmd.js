@@ -1,4 +1,6 @@
-// OSCommandHelper.js
+//,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+// OSCommandHelper.js – OS utilities |
+//```````````````````````````````````
 import os from 'os';
 import process from 'process';
 
@@ -8,8 +10,7 @@ class OSCommandHelper {
   }
 
   getOSType() {
-    const platform = process.platform;
-    switch (platform) {
+    switch (process.platform) {
       case 'win32': return 'Windows';
       case 'darwin': return 'macOS';
       case 'linux': return 'Linux';
@@ -17,46 +18,26 @@ class OSCommandHelper {
     }
   }
 
-  /**
-   * Returns the appropriate shell command to get running Node.js processes.
-   */
   getNodeProcessListCommand() {
-    switch (this.osType) {
-      case 'Windows': return 'tasklist';
-      case 'macOS':
-      case 'Linux': return 'ps -ef';
-      default: return null;
-    }
+    return this.osType === 'Windows' ? 'tasklist' : 'ps -ef';
   }
 
-  /**
-   * Returns the command to kill a process by PID.
-   * @param {number|string} pid
-   */
   getKillCommand(pid) {
-    switch (this.osType) {
-      case 'Windows': return `taskkill /F /PID ${pid}`;
-      case 'macOS':
-      case 'Linux': return `kill ${pid}`;
-      default: return null;
-    }
+    return this.osType === 'Windows' ? `taskkill /F /PID ${pid}` : `kill ${pid}`;
   }
 
-  /**
-   * Returns a generic info message for displaying to user.
-   */
   getInfoMessage() {
     return `[STARTUP] 🖥 Detected OS: ${this.osType}`;
   }
 
-  /**
-   * Suggest proper shell usage
-   */
   getShellUsageNote() {
-    if (this.osType === 'Windows') {
-      return '[STARTUP] 💡 Use Command Prompt or PowerShell for Windows compatibility.';
-    }
-    return '[STARTUP] 💡 Use bash/zsh terminal for best experience on Linux/macOS.';
+    return this.osType === 'Windows'
+      ? '[STARTUP] 💡 Use Command Prompt or PowerShell for Windows compatibility.'
+      : '[STARTUP] 💡 Use bash/zsh terminal for best experience on Linux/macOS.';
   }
 }
+
 export default OSCommandHelper;
+//,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+// END OF OSCommandHelper.js |
+//````````````````````````````

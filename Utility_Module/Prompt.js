@@ -1,36 +1,54 @@
-//,,,,,,,,,,,,,,,,,,|
-//Start OF Prompt.js|
-//``````````````````|
+//,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+// Prompt.js – Dynamic CLI Prompt System (2025) |
+//```````````````````````````````````````````````
 
 import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
+
 /**
- * Dynamic banner-style prompt.
- * Shows a simple one-line header like a thumbnail,
- * then prompts once with smart defaults.
- * @param {string} field - What the prompt should display (acts like a banner)
- * @param {string | boolean} defaultV - The current/default value
- * @returns {Promise<string | boolean>}
+ * Displays a dynamic input banner and returns raw user input.
+ * @param {{
+ *   promptTitle: string,
+ *   promptAsk: string,
+ *   defaultValue?: string | boolean | number
+ * }} options
+ * @returns {Promise<string | boolean | number>}
  */
-export async function getUserInputDynamic(field, defaultV = '') {
+export async function getUserInput(options = {}) {
+  const { promptTitle, promptAsk, defaultValue = '' } = options;
+
   const rl = readline.createInterface({ input, output });
-  const inputType = typeof defaultV;
-  // Optional tip above prompt
-  if (inputType === 'boolean') {
-    console.log(`[TIP] Enter 'true' to enable, 'false' to disable (default: ${defaultV})`);
+  const type = typeof defaultValue;
+
+  // Display banner
+  console.log(`\n# ${promptTitle}`);
+  console.log(`[INFO] ${promptAsk}`);
+  if (type === 'boolean') {
+    console.log(`[TIP] Enter 'true' or 'false' (default: ${defaultValue})`);
   }
-  // Banner-style line
-  process.stdout.write(`${field} = `);
-  const response = await rl.question('');
+
+  process.stdout.write('> ');
+  const raw = await rl.question('');
   rl.close();
-  if (inputType === 'boolean') {
-    const lower = response.trim().toLowerCase();
+
+  const trimmed = raw.trim();
+  if (!trimmed) return defaultValue;
+
+  if (type === 'boolean') {
+    const lower = trimmed.toLowerCase();
     if (lower === 'true') return true;
     if (lower === 'false') return false;
-    return defaultV;
+    return defaultValue;
   }
-  return response.trim() || defaultV;
+
+  if (type === 'number') {
+    const num = Number(trimmed);
+    return isNaN(num) ? defaultValue : num;
+  }
+
+  return trimmed;
 }
-//````````````````|
-//End OF Prompt.js|
-//,,,,,,,,,,,,,,,,|
+
+//,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+// END OF Prompt.js |
+//```````````````````````````````````````````````
