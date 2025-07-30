@@ -2,14 +2,16 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { spawn } from 'child_process';
 import { bcodePath } from '../defined/path-define.js';
 import { TokenManager } from '../Bcode/utils/TokenManager.js';
 import OSCommandHelper from './OScmd.js';
-import { getUserInputDynamic } from './Prompt.js'; // ✅ imported your dynamic prompt
+import { getUserInputDynamic } from './Prompt.js';
+
 // __dirname polyfill for ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+const tokenJsonPath = path.join(bcodePath, 'config', 'token.json');
 
 class TokenEditorUtility {
   constructor(setInputLockCallback) {
@@ -30,55 +32,6 @@ class TokenEditorUtility {
     return discordTokenRegex.test(token);
   }
 
-  async saveTokenInteractive() {
-  try {
-    const defaultValue = ''; // Or load previous token from JSON if needed
-    const token = await getUserInputDynamic('Enter new Discord Bot Token', defaultValue);
-
-    this.unlockInput();
-
-    if (!token || !token.trim()) {
-      console.log('[TOKEN] ⚠️ No token provided or user cancelled. Startup continues.');
-      return null;
-    }
-
-    await this.tokenManager.saveToken(token);
-    console.log('[TOKEN] 💾 Token saved successfully.');
-    return token;
-  } catch (err) {
-    console.error('[TOKEN] ❌ Unexpected error during token save:', err);
-    this.unlockInput();
-    return null;
-  }
-}
-
-  async editTokenInteractive() {
-  try {
-    const currentToken = await this.tokenManager.loadFromJson();
-    const token = await getUserInputDynamic('Edit Discord Token', currentToken || '');
-
-    this.unlockInput();
-
-    if (!token || !token.trim()) {
-      console.log('[TOKEN] ⚠️ Token edit aborted or no data entered.');
-      return null;
-    }
-
-    const errorMessage = this.validateToken(token);
-    if (errorMessage) {
-      console.log(`[TOKEN] ❌ ${errorMessage}`);
-      return null;
-    }
-
-    await this.tokenManager.saveToken(token);
-    console.log('[TOKEN] ✅ Token edited and saved successfully.');
-    return token;
-  } catch (err) {
-    console.error('Unexpected error during token edit:', err);
-    this.unlockInput();
-    return null;
-  }
-}
   validateToken(token) {
     if (!this.isValidTokenFormat(token)) {
       return 'Error: ⛔️ Invalid token format. Please use a valid token format.';
@@ -89,25 +42,149 @@ class TokenEditorUtility {
     return null;
   }
 
-  deleteToken() {
-    const tokenJsonPath = path.join(bcodePath, 'config', 'token.json');
+  readTokenJson() {
     try {
       if (!fs.existsSync(tokenJsonPath)) {
-        const defaultData = { token: '' };
-        fs.mkdirSync(path.dirname(tokenJsonPath), { recursive: true });
-        fs.writeFileSync(tokenJsonPath, JSON.stringify(defaultData, null, 2));
-        console.log('[TOKEN] 📁 Created missing token.json file.');
+        return { temp: '', save: '' };
       }
+      return JSON.parse(fs.readFileSync(tokenJsonPath, 'utf8'));
+    } catch {
+      return { temp: '', save: '' };
+    }
+  }
 
-      const tokenJson = JSON.parse(fs.readFileSync(tokenJsonPath, 'utf8'));
-      tokenJson.token = '';
-      fs.writeFileSync(tokenJsonPath, JSON.stringify(tokenJson, null, 2));
-      console.log('[TOKEN] 🧹 Token deleted successfully.');
+  writeTokenJson(data) {
+    try {
+      fs.mkdirSync(path.dirname(tokenJsonPath), { recursive: true });
+      fs.writeFileSync(tokenJsonPath, JSON.stringify(data, null, 2));
       return true;
     } catch (err) {
-      console.error('Error deleting token:', err);
+      console.error('[TOKEN] ❌ Failed to write token.json:', err);
       return false;
     }
+  }
+
+  async editTokenInteractive() {
+    try {
+      const tokens = this.readTokenJson();
+
+      const token = await getUserInputDynamic(
+        '# token edit',
+        'Enter your bot token (string format)',
+        tokens.temp || tokens.save || ''
+      );
+
+      this.unlockInput();
+
+      if (!token || !token.trim()) {
+        console.log('[TOKEN] ⚠️ Token edit aborted or no data entered.');
+        return null;
+      }
+
+      const errorMessage = this.validateToken(token);
+      if (errorMessage) {
+        console.log(`[TOKEN] ❌ ${errorMessage}`);
+        return null;
+      }
+
+      tokens.temp = token;
+      this.writeTokenJson(tokens);
+      console.log('[TOKEN] ✅ Temp token set. Use `# token save` to persist.');
+      return token;
+    } catch (err) {
+      console.error('[TOKEN] ❌ Error during token edit:', err);
+      this.unlockInput();
+      return null;
+    }
+  }
+
+  async saveTokenInteractive() {
+    try {
+      const tokens = this.readTokenJson();
+      const token = tokens.temp;
+
+      this.unlockInput();
+
+      if (!token || !token.trim()) {
+        console.log('[TOKEN] ⚠️ No temporary token to save.');
+        return false;
+      }
+
+      const errorMessage = this.validateToken(token);
+      if (errorMessage) {
+        console.log(`[TOKEN] ❌ ${errorMessage}`);
+        return false;
+      }
+
+      tokens.save = token;
+      tokens.temp = '';
+      this.writeTokenJson(tokens);
+      console.log('[TOKEN] 💾 Temp token saved as permanent.');
+      return true;
+    } catch (err) {
+      console.error('[TOKEN] ❌ Error saving token:', err);
+      this.unlockInput();
+      return false;
+    }
+  }
+
+  async saveTokenPersistent(token = null) {
+    try {
+      if (!token) {
+        token = await getUserInputDynamic(
+          '# token save',
+          'Enter permanent bot token to save',
+          ''
+        );
+
+        if (!token || !token.trim()) {
+          console.log('[TOKEN] ❌ No token entered. Operation cancelled.');
+          return false;
+        }
+      }
+
+      const errorMessage = this.validateToken(token);
+      if (errorMessage) {
+        console.log(`[TOKEN] ❌ ${errorMessage}`);
+        return false;
+      }
+
+      const tokens = this.readTokenJson();
+      tokens.save = token;
+      tokens.temp = '';
+      this.writeTokenJson(tokens);
+      console.log('[TOKEN] 🔐 Permanent token saved successfully.');
+      return true;
+    } catch (err) {
+      console.error('[TOKEN] ❌ Failed to save permanent token:', err);
+      return false;
+    }
+  }
+
+  deleteToken({ all = false } = {}) {
+    try {
+      const tokens = this.readTokenJson();
+
+      if (all) {
+        tokens.save = '';
+        tokens.temp = '';
+        console.log('[TOKEN] 🧹 Deleted both saved and temporary token.');
+      } else {
+        tokens.temp = '';
+        console.log('[TOKEN] 🧼 Temporary token cleared.');
+      }
+
+      this.writeTokenJson(tokens);
+      return true;
+    } catch (err) {
+      console.error('[TOKEN] ❌ Failed to delete token:', err);
+      return false;
+    }
+  }
+
+  async loadTokenForStartup() {
+    const tokens = this.readTokenJson();
+    return tokens.save || null;
   }
 }
 
