@@ -1,5 +1,5 @@
 {
-  "about": true,
+  "about": false,
   "console.report": true,
   "console.tell": true,
   "console.runtime": true,

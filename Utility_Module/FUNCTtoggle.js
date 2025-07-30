@@ -5,133 +5,105 @@ import { commandsJsonPath, cmdPath, bcodePath } from '../defined/path-define.js'
 const snapshotDir = path.join(bcodePath, 'config', 'cmd_snapshots');
 
 class CommandToggleManager {
+  static get commands() {
+    return fs.existsSync(commandsJsonPath)
+      ? JSON.parse(fs.readFileSync(commandsJsonPath, 'utf8'))
+      : {};
+  }
+
+  static saveCommands(data) {
+    fs.writeFileSync(commandsJsonPath, JSON.stringify(data, null, 2));
+  }
+
   static ensureSnapshotDir() {
-    if (!fs.existsSync(snapshotDir)) {
-      fs.mkdirSync(snapshotDir, { recursive: true });
-    }
-  }
-
-  static getDateString() {
-    return new Date().toISOString().split('T')[0];
-  }
-
-  static cleanupOldSnapshots() {
-    const files = fs.readdirSync(snapshotDir)
-      .filter(f => f.endsWith('.json'))
-      .sort((a, b) => fs.statSync(path.join(snapshotDir, a)).mtimeMs - fs.statSync(path.join(snapshotDir, b)).mtimeMs);
-
-    while (files.length > 5) {
-      const oldest = files.shift();
-      fs.unlinkSync(path.join(snapshotDir, oldest));
-    }
+    if (!fs.existsSync(snapshotDir)) fs.mkdirSync(snapshotDir, { recursive: true });
   }
 
   static snapshotCommandsJson() {
     this.ensureSnapshotDir();
-    const dateString = this.getDateString();
-    const snapshotPath = path.join(snapshotDir, `commands_${dateString}.json`);
-    if (!fs.existsSync(snapshotPath)) {
-      fs.copyFileSync(commandsJsonPath, snapshotPath);
+    const file = `commands_${new Date().toISOString().split('T')[0]}.json`;
+    const target = path.join(snapshotDir, file);
+    if (!fs.existsSync(target)) {
+      fs.copyFileSync(commandsJsonPath, target);
       this.cleanupOldSnapshots();
-      console.log(`[CMD] 📦 Snapshot created: ${snapshotPath}`);
+      console.log(`[CMD] 📦 Snapshot created: ${file}`);
     }
+  }
+
+  static cleanupOldSnapshots() {
+    const files = fs.readdirSync(snapshotDir).filter(f => f.endsWith('.json'))
+      .sort((a, b) => fs.statSync(path.join(snapshotDir, a)).mtimeMs - fs.statSync(path.join(snapshotDir, b)).mtimeMs);
+    while (files.length > 5) fs.unlinkSync(path.join(snapshotDir, files.shift()));
   }
 
   static createCommandsJson(force = false) {
-    if (fs.existsSync(commandsJsonPath)) {
-      if (force) this.snapshotCommandsJson();
+    if (fs.existsSync(commandsJsonPath) && force) {
+      this.snapshotCommandsJson();
       fs.unlinkSync(commandsJsonPath);
-      console.log('[CMD] 🗑 Existing commands.json file deleted.');
     }
 
     const commandsJson = {};
-    const files = fs.readdirSync(cmdPath);
-
-    files.forEach((file) => {
+    for (const file of fs.readdirSync(cmdPath)) {
       const filePath = path.join(cmdPath, file);
-      if (fs.statSync(filePath).isDirectory() || !file.endsWith('.js')) return;
+      if (!file.endsWith('.js') || fs.statSync(filePath).isDirectory()) continue;
 
-      const fileContent = fs.readFileSync(filePath, 'utf8');
-      const mainMatch = fileContent.match(/new\s+SlashCommandBuilder\(\)[\s\S]*?\.setName\(['"](.+?)['"]\)/);
-      if (!mainMatch) return;
+      const content = fs.readFileSync(filePath, 'utf8');
+      const main = content.match(/new\s+SlashCommandBuilder\(\)[\s\S]*?\.setName\(['"](.+?)['"]\)/);
+      if (!main) continue;
+      const parent = main[1];
+      const subs = [...content.matchAll(/\.addSubcommand\([\s\S]*?\.setName\(['"](.+?)['"]\)/g)];
 
-      const parentCommand = mainMatch[1];
-      const subMatches = [...fileContent.matchAll(/\.addSubcommand\([\s\S]*?\.setName\(['"](.+?)['"]\)/g)];
+      if (subs.length) subs.forEach(m => commandsJson[`${parent}.${m[1]}`] = true);
+      else commandsJson[parent] = true;
+    }
 
-      if (subMatches.length > 0) {
-        subMatches.forEach((match) => {
-          const sub = match[1];
-          commandsJson[`${parentCommand}.${sub}`] = true;
-        });
-      } else {
-        commandsJson[parentCommand] = true;
-      }
-    });
-
-    fs.writeFileSync(commandsJsonPath, JSON.stringify(commandsJson, null, 2));
-    console.log('[CMD] ✅ commands.json file created successfully!');
+    this.saveCommands(commandsJson);
+    console.log('[CMD] ✅ commands.json generated.');
     this.snapshotCommandsJson();
   }
 
-  static toggleCommand(commandName) {
-    const commandsJson = JSON.parse(fs.readFileSync(commandsJsonPath, 'utf8'));
-
-    if (commandsJson.hasOwnProperty(commandName)) {
-      commandsJson[commandName] = !commandsJson[commandName];
-      const status = commandsJson[commandName] ? 'enabled' : 'disabled';
-      console.log(`[CMD] ${status === 'enabled' ? '✅' : '❌'} Command "${commandName}" ${status}.`);
-    } else {
-      commandsJson[commandName] = true;
-      console.log(`[CMD] ✅ Command "${commandName}" enabled.`);
-    }
-
-    fs.writeFileSync(commandsJsonPath, JSON.stringify(commandsJson, null, 2));
+  static toggleCommand(cmd) {
+    const data = this.commands;
+    data[cmd] = !data[cmd];
+    this.saveCommands(data);
+    console.log(`[CMD] ${data[cmd] ? '✅ Enabled' : '❌ Disabled'}: ${cmd}`);
     this.snapshotCommandsJson();
+  }
+
+  static enableCommand(cmd) {
+    const data = this.commands;
+    data[cmd] = true;
+    this.saveCommands(data);
+    console.log(`[CMD] ✅ Enabled: ${cmd}`);
+  }
+
+  static disableCommand(cmd) {
+    const data = this.commands;
+    if (data.hasOwnProperty(cmd)) {
+      data[cmd] = false;
+      this.saveCommands(data);
+      console.log(`[CMD] ❌ Disabled: ${cmd}`);
+    } else {
+      console.log(`[CMD] ⚠️ Not Found: ${cmd}`);
+    }
   }
 
   static listTogglableCommands() {
-    const commandsJson = JSON.parse(fs.readFileSync(commandsJsonPath, 'utf8'));
-    const commandTree = {};
+    const data = this.commands;
+    const tree = {};
+    for (const k in data) {
+      const [p, s] = k.split('.');
+      if (!tree[p]) tree[p] = [];
+      if (s) tree[p].push(`${p}.${s}`);
+    }
 
-    Object.keys(commandsJson).forEach(key => {
-      const parts = key.split('.');
-      const parent = parts[0];
-      const sub = parts[1];
-
-      if (!commandTree[parent]) commandTree[parent] = [];
-      if (sub) commandTree[parent].push(`${parent}.${sub}`);
+    console.log('[CMD] 📋 Togglable Commands:');
+    Object.keys(tree).sort().forEach(p => {
+      console.log(`- ${p}`);
+      const subs = tree[p].sort();
+      if (!subs.length && data[p] !== undefined) console.log(`    ${p} = ${data[p]}`);
+      subs.forEach(sub => console.log(`    ${sub} = ${data[sub]}`));
     });
-
-    console.log('[CMD] 📋 Currently toggled commands:');
-    const sortedParents = Object.keys(commandTree).sort();
-    for (const parent of sortedParents) {
-      console.log(`- ${parent}`);
-      const subs = commandTree[parent].sort();
-      if (subs.length === 0 && commandsJson[parent] !== undefined) {
-        console.log(`    ${parent} = ${commandsJson[parent]}`);
-      }
-      for (const sub of subs) {
-        console.log(`    ${sub} = ${commandsJson[sub]}`);
-      }
-    }
-  }
-
-  static enableCommand(name) {
-    const commandsJson = JSON.parse(fs.readFileSync(commandsJsonPath, 'utf8'));
-    commandsJson[name] = true;
-    fs.writeFileSync(commandsJsonPath, JSON.stringify(commandsJson, null, 2));
-    console.log(`[CMD] ✅ Command "${name}" enabled.`);
-  }
-
-  static disableCommand(name) {
-    const commandsJson = JSON.parse(fs.readFileSync(commandsJsonPath, 'utf8'));
-    if (commandsJson.hasOwnProperty(name)) {
-      commandsJson[name] = false;
-      fs.writeFileSync(commandsJsonPath, JSON.stringify(commandsJson, null, 2));
-      console.log(`[CMD] ❌ Command "${name}" disabled.`);
-    } else {
-      console.log(`[CMD] ⚠️ Command "${name}" not found.`);
-    }
   }
 
   static regenerateCommandJson() {
@@ -139,48 +111,42 @@ class CommandToggleManager {
   }
 
   static deleteSnapshots() {
-    if (fs.existsSync(snapshotDir)) {
-      const files = fs.readdirSync(snapshotDir).filter(f => f.endsWith('.json'));
-      for (const file of files) {
-        fs.unlinkSync(path.join(snapshotDir, file));
-      }
-      console.log('[CMD] 🗑 All snapshots deleted.');
-    }
+    if (!fs.existsSync(snapshotDir)) return;
+    fs.readdirSync(snapshotDir).filter(f => f.endsWith('.json')).forEach(f =>
+      fs.unlinkSync(path.join(snapshotDir, f))
+    );
+    console.log('[CMD] 🗑 Snapshots deleted.');
   }
 
   static listSnapshots() {
-    if (!fs.existsSync(snapshotDir)) return console.log('[CMD] No snapshot directory found.');
+    if (!fs.existsSync(snapshotDir)) return console.log('[CMD] No snapshot directory.');
     const files = fs.readdirSync(snapshotDir).filter(f => f.endsWith('.json'));
-    if (files.length === 0) return console.log('[CMD] No snapshots found.');
-    console.log('[CMD] 📂 Snapshots:');
-    files.forEach(f => console.log(`- ${f}`));
+    if (!files.length) return console.log('[CMD] No snapshots found.');
+    console.log('[CMD] 📂 Snapshots:'); files.forEach(f => console.log(`- ${f}`));
+  }
+
+  static rollbackSnapshot(name) {
+    const target = path.join(snapshotDir, name);
+    if (!fs.existsSync(target)) return console.log(`[CMD] ❌ Not found: ${name}`);
+    fs.copyFileSync(target, commandsJsonPath);
+    console.log(`[CMD] 🔁 Rolled back to: ${name}`);
   }
 
   static takeSnapshot() {
     this.snapshotCommandsJson();
   }
 
-  static rollbackSnapshot(snapshotName) {
-    const snapshotPath = path.join(snapshotDir, snapshotName);
-    if (!fs.existsSync(snapshotPath)) {
-      console.log(`[CMD] ❌ Snapshot "${snapshotName}" not found.`);
-      return;
-    }
-    fs.copyFileSync(snapshotPath, commandsJsonPath);
-    console.log(`[CMD] 🔁 Rolled back to snapshot: ${snapshotName}`);
-  }
-
   static toggleHelp() {
-    console.log('[# TOGGLE] List of Available # toggle Commands:');
-    console.log('  # toggle list                 → Lists all currently enabled commands');
-    console.log('  # toggle on <command.name>   → Enables a specific command');
-    console.log('  # toggle off <command.name>  → Disables a specific command');
-    console.log('  # toggle update              → Rebuilds commands.json from scratch');
-    console.log('  # toggle cleanup             → Deletes all snapshots');
-    console.log('  # toggle snapshot            → Takes a new snapshot');
-    console.log('  # toggle rollback list       → Lists all available snapshots');
-    console.log('  # toggle rollback <filename> → Rollback to a specific snapshot');
-    console.log('  # toggle help                → Shows this help info');
+    console.log('[# TOGGLE] Available # toggle Commands:\n' +
+      '  # toggle list                 → List enabled commands\n' +
+      '  # toggle on <cmd>            → Enable command\n' +
+      '  # toggle off <cmd>           → Disable command\n' +
+      '  # toggle update              → Rebuild commands.json\n' +
+      '  # toggle cleanup             → Delete snapshots\n' +
+      '  # toggle snapshot            → Take snapshot\n' +
+      '  # toggle rollback list       → List snapshots\n' +
+      '  # toggle rollback <file>     → Rollback snapshot\n' +
+      '  # toggle help                → Show help');
   }
 }
 

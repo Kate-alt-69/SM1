@@ -14,32 +14,28 @@ import {
 
 const rootDir = bcodePath.replace(/[/\\]Bcode$/, '');
 const pidPath = path.resolve('./Utility_Module/PID.json');
+const tokenPath = path.resolve('./Utility_Module/token.json');
 
 export default function CMDstop({ restart = false, shutdown = false } = {}) {
   console.log('[CMDstop] 🛑 Attempting to stop bot process...');
 
-  let killed = false;
-  let pid = null;
-  let title = 'DISCORDSERVERMANAGER';
-  let botrunning = false;
+  let killed = false, pid = null, title = 'DISCORDSERVERMANAGER', botrunning = false;
 
-  // Load PID.json
   if (fs.existsSync(pidPath)) {
     try {
       const data = JSON.parse(fs.readFileSync(pidPath, 'utf-8'));
-      if (typeof data.PID === 'number') pid = data.PID;
-      if (typeof data.START === 'string') title = data.START;
-      if (typeof data.botrunning === 'boolean') botrunning = data.botrunning;
+      pid = typeof data.PID === 'number' ? data.PID : null;
+      title = typeof data.START === 'string' ? data.START : title;
+      botrunning = typeof data.botrunning === 'boolean' ? data.botrunning : false;
     } catch (err) {
       console.error(`[CMDstop] ❌ Failed to read PID.json: ${err.message}`);
     }
   }
 
-  // If marked running, attempt to kill by PID
   if (botrunning && pid) {
     try {
-      process.kill(pid, 0);  // Check if alive
-      process.kill(pid);     // Kill it
+      process.kill(pid, 0);
+      process.kill(pid);
       console.log(`[CMDstop] ✅ Killed bot process with PID: ${pid}`);
       killed = true;
     } catch {
@@ -47,12 +43,10 @@ export default function CMDstop({ restart = false, shutdown = false } = {}) {
     }
   }
 
-  // Fallback: Try to find process by script name (DCB.js)
   if (!killed) {
     try {
-      const output = execSync('ps -ef').toString();
-      const lines = output.split('\n');
-      for (const line of lines) {
+      const output = execSync('ps -ef').toString().split('\n');
+      for (const line of output) {
         if (line.includes('node') && line.includes('DCB.js')) {
           const parts = line.trim().split(/\s+/);
           const foundPid = parts[1];
@@ -68,7 +62,6 @@ export default function CMDstop({ restart = false, shutdown = false } = {}) {
     }
   }
 
-  // Mark bot as not running
   try {
     if (fs.existsSync(pidPath)) {
       const data = JSON.parse(fs.readFileSync(pidPath, 'utf-8'));
@@ -80,26 +73,22 @@ export default function CMDstop({ restart = false, shutdown = false } = {}) {
     console.error(`[CMDstop] ❌ Failed to update PID.json: ${err.message}`);
   }
 
-  // Clean up node_modules to save disk space
-  try {
-    const rootModules = path.join(rootDir, 'node_modules');
-    const bcodeModules = path.join(bcodePath, 'node_modules');
-
-    if (fs.existsSync(rootModules)) {
-      fs.rmSync(rootModules, { recursive: true, force: true });
-      console.log('[CMDstop] 🧹 Removed root node_modules directory');
-    }
-
-    if (fs.existsSync(bcodeModules)) {
-      fs.rmSync(bcodeModules, { recursive: true, force: true });
-      console.log('[CMDstop] 🧹 Removed Bcode node_modules directory');
-    }
-  } catch (err) {
-    console.error(`[CMDstop] ❌ Failed to remove node_modules: ${err.message}`);
-  }
-
-  // Final shutdown
   if (shutdown) {
+    try {
+      if (fs.existsSync(tokenPath)) {
+        const tokenData = JSON.parse(fs.readFileSync(tokenPath, 'utf-8'));
+        if ('temp' in tokenData) {
+          delete tokenData.temp;
+          fs.writeFileSync(tokenPath, JSON.stringify(tokenData, null, 2));
+          console.log(`[CMDstop] 🔐 Removed temporary token from token.json`);
+        } else {
+          console.log(`[CMDstop] ℹ️ No temp token found in token.json`);
+        }
+      }
+    } catch (err) {
+      console.error(`[CMDstop] ❌ Failed to update token.json: ${err.message}`);
+    }
+
     if (botrunning && !killed) {
       console.log('[CMDstop] ⚠️ Bot was marked as running but could not be killed. Manual intervention may be needed.');
     } else {
