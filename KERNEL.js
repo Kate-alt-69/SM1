@@ -4,7 +4,7 @@
 
 console.log('[STARTUP] Starting Bcode Startup Script...');
 import path from 'path'; import fs from 'fs'; import { execSync } from 'child_process'; import { fileURLToPath } from 'url';
-import { checkBcodeStructure } from './Utility_Module/KNchecksum.js';
+import { KNchecksum } from './Utility_Module/KNchecksum.js';
 import moduleCHK from './Bcode/utils/moduleCHK.js';
 import startup from './Utility_Module/CMDstartup.js';
 import CMDstart from './Utility_Module/CMDstart.js';
@@ -13,7 +13,7 @@ import { bcodePath, tokenPath, cmdPath, commandsJsonPath, configPath } from './d
 import * as Settings from './Utility_Module/FUNCTsetting.js';
 
 const __filename = fileURLToPath(import.meta.url); const __dirname = path.dirname(__filename);
-await checkBcodeStructure(); console.log('[CHECK] ✔️ Bcode structure verified successfully!');
+await KNchecksum.checkBcodeStructure(); console.log('[CHECK] ✔️ Bcode structure verified successfully!');
 
 try { execSync('npm install', { cwd: __dirname, stdio: 'inherit' }); console.log('[STARTUP] ✔️ Root dependencies installed'); }
 catch (err) { console.error('[STARTUP] ❌ Failed to install dependencies:', err.message); }
