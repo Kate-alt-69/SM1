@@ -1,8 +1,7 @@
 {
   "START": "DISCORDSERVERMANAGER",
-  "PID": 106093,
-  "TIMESTAMP": "2025-07-29T17:49:00.531Z",
+  "PID": 18743,
+  "TIMESTAMP": "2025-07-31T16:20:56.876Z",
   "FILE": "/workspaces/SM1/Bcode/DCB.js",
-  "botrunning": true,
-  "kernelpid": 79343
+  "botrunning": false
 }
