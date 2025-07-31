@@ -1,23 +1,21 @@
-// tokenEditorUtility.js
+//,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
+// TokenEditorUtility.js — Uses Prompt class and modern Token workflow     |
+// Updated: 2025                                                            |
+//------------------------------------------------------------------------//
+
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-import { bcodePath } from '../defined/path-define.js';
-import { TokenManager } from '../Bcode/utils/TokenManager.js';
+import Prompt from './Prompt.js'; // Default class import
+import TokenManagerCJS from '../Bcode/utils/TokenManager.js'; 
 import OSCommandHelper from './OScmd.js';
-import { getUserInputDynamic } from './Prompt.js';
-
-// __dirname polyfill for ESM
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const tokenJsonPath = path.join(bcodePath, 'config', 'token.json');
-
+import { tokenPath } from '../defined/path-define.js';
+const { TokenManager } = TokenManagerCJS; 
 class TokenEditorUtility {
   constructor(setInputLockCallback) {
     this.tokenManager = new TokenManager();
     this.unlockInput = setInputLockCallback;
     this.osHelper = new OSCommandHelper();
+    this.prompt = new Prompt(); // Instantiate prompt class
 
     console.log(this.osHelper.getInfoMessage());
     console.log(this.osHelper.getShellUsageNote());
@@ -44,10 +42,10 @@ class TokenEditorUtility {
 
   readTokenJson() {
     try {
-      if (!fs.existsSync(tokenJsonPath)) {
+      if (!fs.existsSync(tokenPath)) {
         return { temp: '', save: '' };
       }
-      return JSON.parse(fs.readFileSync(tokenJsonPath, 'utf8'));
+      return JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
     } catch {
       return { temp: '', save: '' };
     }
@@ -55,8 +53,8 @@ class TokenEditorUtility {
 
   writeTokenJson(data) {
     try {
-      fs.mkdirSync(path.dirname(tokenJsonPath), { recursive: true });
-      fs.writeFileSync(tokenJsonPath, JSON.stringify(data, null, 2));
+      fs.mkdirSync(path.dirname(tokenPath), { recursive: true });
+      fs.writeFileSync(tokenPath, JSON.stringify(data, null, 2));
       return true;
     } catch (err) {
       console.error('[TOKEN] ❌ Failed to write token.json:', err);
@@ -68,11 +66,11 @@ class TokenEditorUtility {
     try {
       const tokens = this.readTokenJson();
 
-      const token = await getUserInputDynamic(
-        '# token edit',
-        'Enter your bot token (string format)',
-        tokens.temp || tokens.save || ''
-      );
+      const token = await Prompt.ask({
+        promptTitle: '# token edit',
+        promptAsk: 'Enter your bot token.',
+        defaultValue: tokens.temp || tokens.save || ''
+      });
 
       this.unlockInput();
 
@@ -131,11 +129,11 @@ class TokenEditorUtility {
   async saveTokenPersistent(token = null) {
     try {
       if (!token) {
-        token = await getUserInputDynamic(
-          '# token save',
-          'Enter permanent bot token to save',
-          ''
-        );
+        token = await this.prompt.ask({
+          promptTitle: '# token save',
+          promptAsk: 'Enter permanent bot token to save',
+          defaultValue: ''
+        });
 
         if (!token || !token.trim()) {
           console.log('[TOKEN] ❌ No token entered. Operation cancelled.');

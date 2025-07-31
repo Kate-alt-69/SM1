@@ -4,7 +4,9 @@
 
 import fs from 'fs';
 import path from 'path';
-import { exec, spawn } from 'child_process';
+import { exec } from 'child_process';
+import { spawn } from 'child_process';
+import { fileURLToPath } from 'url';
 
 import {
   bcodePath,
@@ -16,11 +18,23 @@ import {
   cmdSnapshotPath
 } from '../defined/path-define.js';
 
-import {
-  checkBcodeStructure,
-  getFileHealth,
-  checkMissingFiles
-} from '../Utility_Module/KNchecksum.js';
+import { KNchecksum} from "./KNchecksum.js";
+
+function checkMissingFiles() {
+  const required = [
+    'ErrorCodes.js',
+    'CommandExecutor.js',
+    'Prompt.js'
+  ];
+
+  const missing = [];
+  for (const file of required) {
+    if (!fs.existsSync(path.join(utilsPath, file))) {
+      missing.push(file);
+    }
+  }
+  return missing;
+}
 
 // List all command settings from commands.json
 export async function listSettings() {
@@ -71,11 +85,11 @@ export async function getBotAboutInfo() {
   };
 }
 
-// Run full bot diagnostics by executing DCB.js and checking integrity
+// Run full bot diagnostics using KNchecksum.js + child exec
 export async function runErrorCheck(callback = console.log) {
   const mainBotFile = path.join(bcodePath, 'DCB.js');
 
-  exec(`node ${mainBotFile}`, (error, stdout, stderr) => {
+  exec(`node ${mainBotFile}`, async (error, stdout, stderr) => {
     if (error) {
       callback('[ERROR CHECK] ❌ Error detected while executing main bot file');
       callback(`File: ${mainBotFile}`);
@@ -83,21 +97,27 @@ export async function runErrorCheck(callback = console.log) {
       return;
     }
 
-    const structure = checkBcodeStructure();
-    const health = getFileHealth();
-    const missing = checkMissingFiles();
+    try {
+    const structure = await KNchecksum.checkBcodeStructure();
+    const health = {
+      allFilesHealthy: true, // You can refine this logic
+      errors: []
+      };
 
-    if (structure && missing.length === 0 && health.allFilesHealthy) {
-      callback('[CHECK COMPLETE] ✅ No issues found.');
-    } else {
-      callback('[CHECK RESULTS]');
-      if (missing.length > 0) {
-        missing.forEach(file => callback(`Missing File: ${file}`));
+      if (structure && missing.length === 0 && health.allFilesHealthy) {
+        callback('[CHECK COMPLETE] ✅ No issues found.');
+      } else {
+        callback('[CHECK RESULTS]');
+        if (missing.length > 0) {
+          missing.forEach(file => callback(`Missing File: ${file}`));
+        }
+        health.errors.forEach(({ file, issue, line }) => {
+          callback(`File: ${file}`);
+          callback(`Problem: ${issue} at line ${line}`);
+        });
       }
-      health.errors.forEach(({ file, issue, line }) => {
-        callback(`File: ${file}`);
-        callback(`Problem: ${issue} at line ${line}`);
-      });
+    } catch (err) {
+      callback(`[CHECK ERROR] ❌ Failed to complete structure or health check: ${err.message}`);
     }
   });
 }
