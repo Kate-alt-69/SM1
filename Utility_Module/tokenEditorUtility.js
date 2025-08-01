@@ -1,24 +1,49 @@
 //,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-// TokenEditorUtility.js — Uses Prompt class and modern Token workflow     |
-// Updated: 2025                                                            |
+// TokenEditorUtility.js — Enhanced Format + Usage Flags Support          |
+// Updated: 2025-08                                                        |
 //------------------------------------------------------------------------//
 
 import fs from 'fs';
 import path from 'path';
-import Prompt from './Prompt.js'; // Default class import
-import TokenManagerCJS from '../Bcode/utils/TokenManager.js'; 
+import Prompt from './Prompt.js';
+import TokenManagerCJS from '../Bcode/utils/TokenManager.js';
 import OSCommandHelper from './OScmd.js';
 import { tokenPath } from '../defined/path-define.js';
-const { TokenManager } = TokenManagerCJS; 
+
+const { TokenManager } = TokenManagerCJS;
+
+const DEFAULT_TOKEN_STRUCTURE = {
+  temp: '',
+  save: '',
+  loadtokensave: false,
+  loadtokentemp: true
+};
+
 class TokenEditorUtility {
   constructor(setInputLockCallback) {
     this.tokenManager = new TokenManager();
     this.unlockInput = setInputLockCallback;
     this.osHelper = new OSCommandHelper();
-    this.prompt = new Prompt(); // Instantiate prompt class
+    this.prompt = new Prompt();
 
     console.log(this.osHelper.getInfoMessage());
     console.log(this.osHelper.getShellUsageNote());
+
+    // Ensure token.json is present on init
+    this.ensureTokenFileExists();
+  }
+
+  ensureTokenFileExists() {
+    if (!fs.existsSync(tokenPath)) {
+      this.writeTokenJson(DEFAULT_TOKEN_STRUCTURE);
+    } else {
+      const tokens = this.readTokenJson();
+      const missingKeys = Object.keys(DEFAULT_TOKEN_STRUCTURE).filter(k => !(k in tokens));
+      if (missingKeys.length > 0) {
+        // Merge missing defaults without overwriting existing values
+        this.writeTokenJson({ ...DEFAULT_TOKEN_STRUCTURE, ...tokens });
+      }
+    }
   }
 
   isValidTokenFormat(token) {
@@ -26,7 +51,7 @@ class TokenEditorUtility {
   }
 
   isDiscordToken(token) {
-    const discordTokenRegex = /^[A-Za-z0-9_-]{24,}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27}$/;
+    const discordTokenRegex = /^[\w-]{20,100}\.[\w-]{6,30}\.[\w-]{27,100}$/;
     return discordTokenRegex.test(token);
   }
 
@@ -42,12 +67,9 @@ class TokenEditorUtility {
 
   readTokenJson() {
     try {
-      if (!fs.existsSync(tokenPath)) {
-        return { temp: '', save: '' };
-      }
       return JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
     } catch {
-      return { temp: '', save: '' };
+      return { ...DEFAULT_TOKEN_STRUCTURE };
     }
   }
 
@@ -116,8 +138,11 @@ class TokenEditorUtility {
 
       tokens.save = token;
       tokens.temp = '';
+      tokens.loadtokensave = true;
+      tokens.loadtokentemp = false;
+
       this.writeTokenJson(tokens);
-      console.log('[TOKEN] 💾 Temp token saved as permanent.');
+      console.log('[TOKEN] 💾 Temp token saved as permanent and set for startup.');
       return true;
     } catch (err) {
       console.error('[TOKEN] ❌ Error saving token:', err);
@@ -150,8 +175,11 @@ class TokenEditorUtility {
       const tokens = this.readTokenJson();
       tokens.save = token;
       tokens.temp = '';
+      tokens.loadtokensave = true;
+      tokens.loadtokentemp = false;
+
       this.writeTokenJson(tokens);
-      console.log('[TOKEN] 🔐 Permanent token saved successfully.');
+      console.log('[TOKEN] 🔐 Permanent token saved and activated.');
       return true;
     } catch (err) {
       console.error('[TOKEN] ❌ Failed to save permanent token:', err);
@@ -166,6 +194,8 @@ class TokenEditorUtility {
       if (all) {
         tokens.save = '';
         tokens.temp = '';
+        tokens.loadtokensave = false;
+        tokens.loadtokentemp = true;
         console.log('[TOKEN] 🧹 Deleted both saved and temporary token.');
       } else {
         tokens.temp = '';
@@ -180,9 +210,27 @@ class TokenEditorUtility {
     }
   }
 
+  async switchTokenMode(mode = 'temp') {
+    const tokens = this.readTokenJson();
+
+    if (mode === 'save') {
+      tokens.loadtokensave = true;
+      tokens.loadtokentemp = false;
+      console.log('[TOKEN] 🟢 Now using SAVED token at startup.');
+    } else {
+      tokens.loadtokentemp = true;
+      tokens.loadtokensave = false;
+      console.log('[TOKEN] 🟢 Now using TEMPORARY token at startup.');
+    }
+
+    this.writeTokenJson(tokens);
+  }
+
   async loadTokenForStartup() {
     const tokens = this.readTokenJson();
-    return tokens.save || null;
+    if (tokens.loadtokentemp) return tokens.temp || null;
+    if (tokens.loadtokensave) return tokens.save || null;
+    return null;
   }
 }
 

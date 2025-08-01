@@ -1,12 +1,124 @@
 {
-  "lastUpdated": "2025-07-29T17:49:02.641Z",
+  "lastUpdated": "2025-08-01T06:30:33.109Z",
   "emojis": [
     {
-      "id": "1384521986230718565",
-      "name": "helloiamkate",
+      "id": "1323764290993389599",
+      "name": "discotoolsxyzicon1",
       "animated": false,
-      "format": "<:helloiamkate:1384521986230718565>",
-      "imageUrl": "https://cdn.discordapp.com/emojis/1384521986230718565.webp?size=64"
+      "format": "<:discotoolsxyzicon1:1323764290993389599>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764290993389599.webp?size=64"
+    },
+    {
+      "id": "1323764559022002247",
+      "name": "grey_arrow",
+      "animated": false,
+      "format": "<:grey_arrow:1323764559022002247>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764559022002247.webp?size=64"
+    },
+    {
+      "id": "1323764562348212336",
+      "name": "Transgender",
+      "animated": false,
+      "format": "<:Transgender:1323764562348212336>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764562348212336.webp?size=64"
+    },
+    {
+      "id": "1323764567582576760",
+      "name": "gender_male",
+      "animated": false,
+      "format": "<:gender_male:1323764567582576760>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764567582576760.webp?size=64"
+    },
+    {
+      "id": "1323764570065604688",
+      "name": "gender_female",
+      "animated": false,
+      "format": "<:gender_female:1323764570065604688>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764570065604688.webp?size=64"
+    },
+    {
+      "id": "1323764814744387584",
+      "name": "REDeyethink",
+      "animated": false,
+      "format": "<:REDeyethink:1323764814744387584>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764814744387584.webp?size=64"
+    },
+    {
+      "id": "1323764819135959070",
+      "name": "fr_sus",
+      "animated": false,
+      "format": "<:fr_sus:1323764819135959070>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764819135959070.webp?size=64"
+    },
+    {
+      "id": "1323764823128805478",
+      "name": "bombasticthinking",
+      "animated": false,
+      "format": "<:bombasticthinking:1323764823128805478>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764823128805478.webp?size=64"
+    },
+    {
+      "id": "1323764826283048982",
+      "name": "Fightinpepe",
+      "animated": false,
+      "format": "<:Fightinpepe:1323764826283048982>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764826283048982.webp?size=64"
+    },
+    {
+      "id": "1323764829827104798",
+      "name": "Moyai_SUS",
+      "animated": false,
+      "format": "<:Moyai_SUS:1323764829827104798>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764829827104798.webp?size=64"
+    },
+    {
+      "id": "1323764832738213959",
+      "name": "STFUpepe",
+      "animated": false,
+      "format": "<:STFUpepe:1323764832738213959>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764832738213959.webp?size=64"
+    },
+    {
+      "id": "1323764836932391002",
+      "name": "cSAD",
+      "animated": false,
+      "format": "<:cSAD:1323764836932391002>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1323764836932391002.webp?size=64"
+    },
+    {
+      "id": "1347096492959076404",
+      "name": "BG_TECHNONEVERDIES",
+      "animated": false,
+      "format": "<:BG_TECHNONEVERDIES:1347096492959076404>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1347096492959076404.webp?size=64"
+    },
+    {
+      "id": "1347096733967974482",
+      "name": "PoliceThumb",
+      "animated": false,
+      "format": "<:PoliceThumb:1347096733967974482>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1347096733967974482.webp?size=64"
+    },
+    {
+      "id": "1347096937702096967",
+      "name": "okay",
+      "animated": false,
+      "format": "<:okay:1347096937702096967>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1347096937702096967.webp?size=64"
+    },
+    {
+      "id": "1347097007457566852",
+      "name": "thumbsup",
+      "animated": false,
+      "format": "<:thumbsup:1347097007457566852>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1347097007457566852.webp?size=64"
+    },
+    {
+      "id": "1347096682906783795",
+      "name": "Dance",
+      "animated": true,
+      "format": "<aDance:1347096682906783795>",
+      "imageUrl": "https://cdn.discordapp.com/emojis/1347096682906783795.webp?size=64"
     }
   ]
 }

@@ -125,7 +125,14 @@ process.stdin.on('data', async (data) => {
   }
   showPrompt(true);
 });
-
+process.on('SIGINT', async () => {
+  console.log('\n[CTRL+C] 🔌 Interrupt signal received (SIGINT)');
+  await shutdownProcess();
+});
+process.on('SIGTERM', async () => {
+  console.log('\n[SIGNAL] 🔌 SIGTERM received');
+  await shutdownProcess();
+});
 process.stdin.resume();
 showPrompt(true);
 
