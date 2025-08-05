@@ -4,8 +4,8 @@ DCB or Server Manager 1, is a little project i am working on for my discord bot 
 You can Call me K8 
 
 ## About. 
-This is Server Manager. My little code project i have been working on for a bit you can say at the time im trying to make a CLI (command line interface) like Application using Python-<br>
--and Nodejs as te backend logic including bot code in the folder **Bcode** i have created Many lines my self with a little bit use of Github Coplit 
+this is Server Manager. My little code project i have been working on for a bit you can say <br>at the time im trying to make commands i can use to control the application code and make an actual app later on<br>
+and Nodejs as the backend logic including bot code in the folder **Bcode** i have created Many lines my self with a little bit use of Github Coplit, Cause it's much easir to learn from it and while it knowing what my workspace it's vary knowing of the context and tells me what should i do and makes me laern how to and what part of a code does what.
 
 with some features 
 ## Including 
@@ -21,11 +21,17 @@ PREFIX=!
 DEBUGGER=true
 ~~~ 
 
-- **utils** folder for saving Module like Code assest's
+- **utils** folder for saving function Modules/code helper
 - Start Up Logging
 - Command Excution Loging and/or Easier Debug
 - Dynamicly Starting up Command Files
-  - how to Create (UPCOMING...)
+  - how to Create **(UPCOMING...)**
+- Token Saving
+- Process Looking Via <br>
+```
+node kernel-launcher
+```
+<br> that would launch the Bot from Terminal or Powershell
 
 ## Upcoming*
 **!!These Features Maybe Still Coming (and/or i forgot to edit the README.md)!!**
@@ -35,7 +41,7 @@ DEBUGGER=true
 - [Galactic](https://galactichosting.net/) Hosting Connection
 - Bcode Folder Updates Via [Archive.org](https://archive.org/)
 - More Kernel Commands
-- Commands Toggle (on/off)
+- Commands Toggle (on/off) [DONE ]
 - More bot Commands
 - Multi OS (Operating System) Support (it's hard)
 
@@ -54,6 +60,12 @@ youtube tutorials about it's functions so i started using [ChatGPT](https://chat
 and yes i did use chatgpt to cleanify my code a little bit since i was a bit lost but in the end it all works great <br>
 and at this time im writing this README.md im still making the jump to DCB-1.2.0 and trust me it's gonna be a MASSIVE jump <br>
 so where ware we yeah it was a bit hard for me to learn discord.js since i couldn't fine any good tutorils about the discord.js<br>since most of them ware jsut begginer lvl coding and i wanted a full on tutorial about discord.js and it's networking and API functions
+
+## BUG iSSUES FOUND
+- Token Not Saving.
+- Discord Bot Command Error
+- 
+
 ## Places You Can Fine K8 
 - Discord you can send me a FR
 ```
@@ -64,3 +76,4 @@ so where ware we yeah it was a bit hard for me to learn discord.js since i could
  <img width="500" height="560" alt="dhwanksh_qr" src="https://github.com/user-attachments/assets/28e883a5-3060-4aca-bc55-de08e2b1b5af" /><br>
 - [Reddit](https://www.reddit.com/user/Helloiamkate_69/)<br>
 - [Spotify](https://open.spotify.com/user/31b35qefpdsqh2vt7feujr63mygq?si=046a37f1761e48bf)
+
