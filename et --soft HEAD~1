@@ -1,0 +1,78 @@
+[33m69b90f0[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mcodespace-symmetrical-enigma-v6r44vw9pqv73xq4x[m[33m, [m[1;32mDCB-SM1-1.2.0[m[33m)[m better # setting runerror
+[33mdbe1068[m Updated TREE
+[33ma2ce7e0[m enter
+[33m5628245[m Added ctrl + C SIGINT update | Added SIGTERM shutdown process
+[33mae098ba[m KERNEL PATCH error list: promt module incurrect usage fixing syntax issue and fixed up to date issue
+[33m41b4114[m Updated Initilization and More Controll | Intruducing # setting NOT PERFECT
+[33m3bf37f9[m initial commit
+[33m034f92a[m Updating Creating Package(DCB-Server.Manager-1.2.0-0001)
+[33m28cbdac[m[33m ([m[1;33mtag: [m[1;33mBeta[m[33m)[m Updated Working Fine
+[33md65870e[m fixed old kernel.js files with newer ones
+[33m0603cbd[m Update DCB-Server.Manager-1.2.0-0001
+[33m0dd52e4[m Revert "MOD = update-SM1-1-2-0.txt"
+[33mf9ca7bc[m MERGE from LOCAL-DEV branch
+[33m0745b1d[m[33m ([m[1;32mLocal-Dev[m[33m)[m Updated PATCH (BIG CHANGE and function fixs)
+[33m7a868ea[m MOD = update-SM1-1-2-0.txt
+[33m4ad584e[m RESTORE VIA REINSTALL LINUX-MINT
+[33mf30244d[m Update README.md
+[33m0912c20[m Name Update from Utility Module To : Utility_module
+[33mb1da428[m Syntax fix
+[33m7e45a34[m Name Update from Utility Module To : Utility_module
+[33m3bfa444[m Syntax fix
+[33m0f6ec86[m Update From LINUX K8 NOW LINUX IN
+[33m94b72ac[m Merge branch 'DCB-SM1-1.2.0' of https://github.com/Kate-alt-69/SM1 into DCB-SM1-1.2.0
+[33m42c9c66[m repaired bug fixs | IMPORT/EXPORT IMPLAMENTED KERNEL LVL | ESM CONFIGIRATION ROOT DIREFTORY |
+[33mbcb2785[m README.MD | UPDATED!
+[33m958e45b[m COMMIT-README.md ADDED
+[33mdef9e59[m .EXE | UPDATED | COMMAND | TOGGLE | STARTING.EXEPROPAGANDA
+[33m55b44ec[m CONSOLE CONTROL (CC) | CONSOLE COMMANDS+ | COMMAND TOGGLE | BUG FIX
+[33m46b224b[m Merge branch 'DCB-SM1-1.2.0' of https://github.com/Kate-alt-69/SM1 into DCB-SM1-1.2.0
+[33m77e48d8[m PACKAGE
+[33m999c526[m Bump undici and discord.js in /Bcode (#5)
+[33med14c13[m Merge branch 'DCB-SM1-1.2.0' of https://github.com/Kate-alt-69/SM1 into DCB-SM1-1.2.0
+[33m7e776b9[m KERNAL | TERMINAL COMMANDS | INTRODUCING SU | DCB | SERVER CONSOL | COMPATIBILITY LINUX/WIN | SERVER LVL
+[33mda45ff2[m Merge pull request #4 from Kate-alt-69/dependabot/npm_and_yarn/Bcode/undici-7.5.0
+[33m9f6327e[m FIXED | PERMISSIONS
+[33m36d88e9[m Bump undici from 6.21.3 to 7.5.0 in /Bcode
+[33m9a63da0[m ERROR/BUG/SIMPLIFY | REMOVED ALL | SETTING UP     "undici": "^6.21.2" | DELETION OF NEUTRALINO |
+[33ma6300b4[m IMPROVMENT : | CONSOL MESSAGE | UPDATE COMMAND LOADER | ERROR HANDLING |
+[33m43ab4cb[m IMPROVMENT : | NPM-INSTALL | NODE_MODULE CHECK |
+[33mcef20e6[m FIXED: Token Loading | Git Errors | Node Module loading Interaction
+[33m8dd01f6[m FIXED
+[33mee9700f[m SM1-1.2.0 (#2)
+[33mf2df28c[m Implement token loading and validation, and enhance data storage management
+[33mca92cdc[m Bug Fixs | Code Image | Formatter Sys | New Data Sys | Fixing = | Embed | Embed create | Embed Stage | Data Writing
+[33m62cc028[m Removed .exe Folder
+[33m81b8f7d[m Browser Excution Date 12-06-25 11:57
+[33m97f8784[m DCB Application Testing and NPM scripts
+[33m935c3c7[m Command intilization
+[33m6f84017[m Code Updated
+[33m467098a[m New Update OF code working
+[33md4ca602[m Intilizing.
+[33m477e823[m New Command
+[33me1d648a[m eee
+[33m97578cd[m Update issue templates
+[33m0090f62[m Update README.md
+[33ma9d4690[m DELETE NODE_MODULE
+[33maa59a86[m Merge branch 'DCB-SM1-1.2.0' of https://github.com/Kate-alt-69/SM1 into DCB-SM1-1.2.0
+[33m8d43a05[m Update README.md
+[33mec395db[m 1.2.0v.exe
+[33m40c1b75[m 1.2.0v
+[33m2733e7a[m[33m ([m[1;33mtag: [m[1;33mv1.1.0pre-release[m[33m)[m FIX'S
+[33mbf2ff4b[m from laptop
+[33m78c0c19[m Translated Into JavaScript For Node.js
+[33m2f63881[m upgraded how thing's work
+[33m1c9ddba[m feat: Implement embed creation and management features
+[33m443aff7[m New Code
+[33mf5f5233[m Add initial data.json file
+[33m71e7496[m Removed files: edited requirements.txt
+[33maff19ef[m modified TO8
+[33mce6c42b[m added import files
+[33m618b790[m i did this at 2:20am
+[33ma1c6224[m Merge branch 'main' of https://github.com/Kate-alt-69/DCB
+[33m0d10bf9[m part 0
+[33m25053cc[m kate did this
+[33m207765f[m README.md
+[33m81c8394[m Add GitHub Actions workflow and configuration
+[33me2e285e[m i added the files
+[33me02912d[m Initial commit

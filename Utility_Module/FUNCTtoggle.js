@@ -137,17 +137,33 @@ class CommandToggleManager {
   }
 
   static toggleHelp() {
-    console.log('[# TOGGLE] Available # toggle Commands:\n' +
-      '  # toggle list                 → List enabled commands\n' +
-      '  # toggle on <cmd>            → Enable command\n' +
-      '  # toggle off <cmd>           → Disable command\n' +
-      '  # toggle update              → Rebuild commands.json\n' +
-      '  # toggle cleanup             → Delete snapshots\n' +
-      '  # toggle snapshot            → Take snapshot\n' +
-      '  # toggle rollback list       → List snapshots\n' +
-      '  # toggle rollback <file>     → Rollback snapshot\n' +
-      '  # toggle help                → Show help');
-  }
+  const commands = [
+    { command: '# toggle list', info: 'List Toggle-able commands' },
+    { command: '# toggle on <cmd>', info: 'Enable a command, remove "<cmd>" with the name of the command showed by toggle list' },
+    { command: '# toggle off <cmd>', info: 'Disable a command, remove "<cmd>" with the name of the command showed by toggle list' },
+    { command: '# toggle update', info: 'Update commands.json' },
+    { command: '# toggle cleanup', info: 'Delete all snapshots' },
+    { command: '# toggle snapshot', info: 'Take a snapshot' },
+    { command: '# toggle rollback list', info: 'List all snapshots' },
+    { command: '# toggle rollback <file>', info: 'Rollback to snapshot, remove <file> with the name of snapshot givin by toggle rollback list' },
+    { command: '# toggle help', info: 'Show this help menu' }
+  ];
+
+  console.log('\n┌─────────┬───────────────────────────────┬─────────────────────────────────────────────────────────────────────────────────────────────┐');
+  console.log('│ (index) │             Command           │ Description                                                                                 │');
+  console.log('├─────────┼───────────────────────────────┼─────────────────────────────────────────────────────────────────────────────────────────────┤');
+
+  commands.forEach((cmd, index) => {
+    const idx = String(index).padEnd(7);
+    const cmdText = cmd.command.padEnd(29);
+    const infoText = cmd.info.padEnd(91);
+    console.log(`│ ${idx} │ ${cmdText} │ ${infoText} │`);
+  });
+
+  console.log('└─────────┴───────────────────────────────┴─────────────────────────────────────────────────────────────────────────────────────────────┘');
+ }
 }
+
+
 
 export default CommandToggleManager;
