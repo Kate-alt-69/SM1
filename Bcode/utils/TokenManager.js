@@ -16,56 +16,63 @@ class TokenManager {
         console.log(`   Env: ${this.envPath}`);
     }
 
+    /**
+     * Load token based on priority:
+     * 1. .env (DEV mode)
+     * 2. token.json (save or temp based on flags)
+     */
     async loadToken() {
         try {
             console.log('\n[SYSTEM] 🔄 Starting token load sequence');
-            console.log('[SYSTEM] 🔍 Checking token sources...');
+
+            // ✅ Check for DEV mode via .env
             const envConfig = dotenv.config({ path: this.envPath });
             const isDevMode = envConfig.parsed?.MODE === 'DEV';
-
             if (isDevMode) {
                 console.log('[SYSTEM] 🔧 Development mode detected');
                 const envToken = envConfig.parsed?.TOKEN;
                 if (!envToken || envToken === 'your-bot-token-here') {
-                    console.error('[HINT] : \n❌ Development Mode Error:');
-                    console.error('The default token value was found in .env file');
-                    throw new Error('{ERROR} ❌ Invalid token in DEV mode - using default value');
+                    throw new Error('Invalid token in .env [DEV MODE]');
                 }
-                console.log('[SYSTEM] ✅ Successfully loaded token from .env [DEV MODE]');
+                console.log('[SYSTEM] ✅ Loaded token from .env [DEV MODE]');
                 this.setTokenInfo(envToken, '.env [DEV MODE]');
                 this.isDev = true;
                 return envToken;
             }
 
+            // ✅ Load token.json
             const jsonData = await fs.readFile(this.configPath, 'utf8');
             const parsed = JSON.parse(jsonData);
             const { save, temp, loadtokensave, loadtokentemp } = parsed;
 
-
+            // Validate toggle states
             if (loadtokensave && loadtokentemp) {
-                throw new Error('{ERROR} ❌ Invalid token.json: Both "loadtokensave" and "loadtokentemp" are true. Only one can be true.');
+                throw new Error('Both loadtokensave and loadtokentemp are true. Only one can be true.');
             }
-
             if (!loadtokensave && !loadtokentemp) {
-                throw new Error('{ERROR} ❌ Invalid token.json: Both "loadtokensave" and "loadtokentemp" are false. At least one must be true.');
+                throw new Error('Both loadtokensave and loadtokentemp are false. One must be true.');
             }
 
             const activeToken = loadtokensave ? save?.trim() : temp?.trim();
             const sourceLabel = loadtokensave ? 'token.json [SAVED]' : 'token.json [TEMP]';
 
             if (!this.isValidTokenFormat(activeToken)) {
-                throw new Error(`❌ Invalid token format in ${sourceLabel}`);
+                throw new Error(`Invalid token format in ${sourceLabel}`);
             }
 
             this.setTokenInfo(activeToken, sourceLabel);
             return activeToken;
 
         } catch (err) {
-            console.error(`{ERROR} \n❌ Token loading failed: ${err.message}`);
+            console.error(`{ERROR} ❌ Token loading failed: ${err.message}`);
+            console.error('[HINT] Ensure token.json or .env is configured properly.');
             return null;
         }
     }
 
+    /**
+     * Validate Discord bot token format
+     */
     isValidTokenFormat(token) {
         const tokenRegex = /^[\w-]{24,}\.[\w-]{6,}\.[\w-]{27,}$/;
         const valid = tokenRegex.test(token.trim());
@@ -75,14 +82,19 @@ class TokenManager {
         return valid;
     }
 
-
+    /**
+     * Store token info and mask it for display
+     */
     setTokenInfo(token, source) {
         this.tokenSource = source;
         this.maskedToken = `${token.slice(0, 5)}...${token.slice(-5)}`;
-        console.log(`[SYSTEM] ✅ Token source set to: ${source}`);
-        console.log(`[SYSTEM] ✅ Token validated and masked: ${this.maskedToken}`);
+        console.log(`[SYSTEM] ✅ Token source set: ${source}`);
+        console.log(`[SYSTEM] ✅ Masked token: ${this.maskedToken}`);
     }
 
+    /**
+     * Display token information with bot stats
+     */
     getTokenInfo() {
         const stats = this.client?.botStats || {
             commands: 0,
@@ -93,18 +105,21 @@ class TokenManager {
             source: this.tokenSource || 'Unknown',
             maskedToken: this.maskedToken || 'Not Available',
             displayString: `===========================================
-                                            BOT STATUS                   
-                            ===========================================
-                            📊 Servers In     : ${this.client?.guilds.cache.size || 0}
-                            🤖 Logged in As   : ${this.client?.user?.tag || 'Unknown'}
-                            🆔 Bot ID         : ${this.client?.user?.id || 'Unknown'}
-                            🔑 Logged in with : ${this.maskedToken} ${this.tokenSource}
-                            📁 Loaded CF      : ${stats.mainCommands || 0}
-                            🎮 Commands Total : ${stats.commands || 0} (${stats.mainCommands} main, ${stats.subCommands} sub)
-                            ===========================================`
+                            BOT STATUS                   
+===========================================
+📊 Servers In     : ${this.client?.guilds?.cache.size || 0}
+🤖 Logged in As   : ${this.client?.user?.tag || 'Unknown'}
+🆔 Bot ID         : ${this.client?.user?.id || 'Unknown'}
+🔑 Logged in with : ${this.maskedToken} (${this.tokenSource})
+📁 Loaded CF      : ${stats.mainCommands || 0}
+🎮 Commands Total : ${stats.commands || 0} (${stats.mainCommands} main, ${stats.subCommands} sub)
+===========================================`
         };
     }
 
+    /**
+     * Save token into token.json (manual override)
+     */
     async saveToken(token) {
         try {
             await fs.mkdir(path.dirname(this.configPath), { recursive: true });

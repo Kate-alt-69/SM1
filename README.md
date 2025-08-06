@@ -64,3 +64,4 @@ so where ware we yeah it was a bit hard for me to learn discord.js since i could
  <img width="500" height="560" alt="dhwanksh_qr" src="https://github.com/user-attachments/assets/28e883a5-3060-4aca-bc55-de08e2b1b5af" /><br>
 - [Reddit](https://www.reddit.com/user/Helloiamkate_69/)<br>
 - [Spotify](https://open.spotify.com/user/31b35qefpdsqh2vt7feujr63mygq?si=046a37f1761e48bf)
+

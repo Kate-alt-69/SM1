@@ -1,7 +1,7 @@
-//,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-// TokenEditorUtility.js — Enhanced Command Handling + Startup Checks     |
-// Updated: 2025-08                                                        |
-//------------------------------------------------------------------------//
+//==========================================================================
+// TokenEditorUtility.js — Enhanced Command Handling + Startup Checks
+// Updated: 2025-08
+//==========================================================================
 
 import fs from 'fs';
 import path from 'path';
@@ -29,11 +29,13 @@ class TokenEditorUtility {
     console.log(this.osHelper.getInfoMessage());
     console.log(this.osHelper.getShellUsageNote());
 
-    // Ensure token.json exists
+    // ✅ Ensure token.json exists with required structure
     this.ensureTokenFileExists();
   }
 
-  // ✅ Ensure token.json exists and has required keys
+  /**
+   * ✅ Ensure token.json exists and has required keys
+   */
   ensureTokenFileExists() {
     if (!fs.existsSync(tokenPath)) {
       this.writeTokenJson(DEFAULT_TOKEN_STRUCTURE);
@@ -46,10 +48,16 @@ class TokenEditorUtility {
     }
   }
 
+  /**
+   * ✅ Validate token format
+   */
   isValidTokenFormat(token) {
     return this.tokenManager.isValidTokenFormat(token);
   }
 
+  /**
+   * ✅ Additional check for Discord token format
+   */
   isDiscordToken(token) {
     const discordTokenRegex = /^[\w-]{20,100}\.[\w-]{6,30}\.[\w-]{27,100}$/;
     return discordTokenRegex.test(token);
@@ -65,6 +73,9 @@ class TokenEditorUtility {
     return null;
   }
 
+  /**
+   * ✅ Read token.json
+   */
   readTokenJson() {
     try {
       return JSON.parse(fs.readFileSync(tokenPath, 'utf8'));
@@ -73,6 +84,9 @@ class TokenEditorUtility {
     }
   }
 
+  /**
+   * ✅ Write token.json
+   */
   writeTokenJson(data) {
     try {
       fs.mkdirSync(path.dirname(tokenPath), { recursive: true });
@@ -84,35 +98,34 @@ class TokenEditorUtility {
     }
   }
 
-  // ✅ Prompt user for token edit
+  /**
+   * ✅ Interactive token edit
+   */
   async editTokenInteractive() {
-  try {
-    const tokens = this.readTokenJson();
+    try {
+      const tokens = this.readTokenJson();
 
-    console.log('\n[INFO] Enter your bot token below (paste it fully and press Enter):\n');
+      console.log('\n[INFO] Enter your bot token below (paste it fully and press Enter):\n');
 
-    // Temporarily disable CLI parser and enable raw prompt
-    this.unlockInput(true); // ✅ Pass true to indicate “lock main parser”
+      this.unlockInput(true); // Lock main parser during input
+      const token = await this.prompt.ask({
+        promptTitle: '# token edit',
+        promptAsk: 'Bot Token:',
+        defaultValue: tokens.temp || tokens.save || '',
+        rawMode: true
+      });
+      this.unlockInput(false); // Restore normal input
 
-    const token = await this.prompt.ask({
-      promptTitle: '# token edit',
-      promptAsk: 'Bot Token:',
-      defaultValue: tokens.temp || tokens.save || '',
-      rawMode: true // ✅ Ensure Prompt.js doesn’t interpret as command
-    });
+      if (!token || !token.trim()) {
+        console.log('[TOKEN] ⚠️ Token edit aborted or no data entered.');
+        return null;
+      }
 
-    this.unlockInput(false); // ✅ Restore normal input mode
-
-    if (!token || !token.trim()) {
-      console.log('[TOKEN] ⚠️ Token edit aborted or no data entered.');
-      return null;
-    }
-
-    const errorMessage = this.validateToken(token);
-    if (errorMessage) {
-      console.log(`[TOKEN] ❌ ${errorMessage}`);
-      return null;
-    }
+      const errorMessage = this.validateToken(token);
+      if (errorMessage) {
+        console.log(`[TOKEN] ❌ ${errorMessage}`);
+        return null;
+      }
 
       tokens.temp = token.trim();
       this.writeTokenJson(tokens);
@@ -125,14 +138,15 @@ class TokenEditorUtility {
     }
   }
 
-
-  // ✅ Save temp token as permanent
+  /**
+   * ✅ Save temporary token as permanent
+   */
   async saveTokenInteractive() {
     try {
       const tokens = this.readTokenJson();
       const token = tokens.temp;
 
-      this.unlockInput();
+      this.unlockInput(false);
 
       if (!token || !token.trim()) {
         console.log('[TOKEN] ⚠️ No temporary token to save.');
@@ -155,12 +169,14 @@ class TokenEditorUtility {
       return true;
     } catch (err) {
       console.error('[TOKEN] ❌ Error saving token:', err);
-      this.unlockInput();
+      this.unlockInput(false);
       return false;
     }
   }
 
-  // ✅ Delete tokens
+  /**
+   * ✅ Delete tokens
+   */
   deleteToken({ all = false } = {}) {
     try {
       const tokens = this.readTokenJson();
@@ -184,7 +200,9 @@ class TokenEditorUtility {
     }
   }
 
-  // ✅ Enable saved or temp token for startup
+  /**
+   * ✅ Switch token modes
+   */
   enableTempToken() {
     try {
       const tokens = this.readTokenJson();
@@ -213,7 +231,9 @@ class TokenEditorUtility {
     }
   }
 
-  // ✅ Load token for startup
+  /**
+   * ✅ Load token for startup
+   */
   async loadTokenForStartup() {
     const tokens = this.readTokenJson();
     if (tokens.loadtokentemp) return tokens.temp || null;
@@ -221,7 +241,9 @@ class TokenEditorUtility {
     return null;
   }
 
-  // ✅ Show help table
+  /**
+   * ✅ Show help table
+   */
   showHelp() {
     console.log('\n┌─────────┬───────────────────────────┬─────────────────────────────────────┐');
     console.log('│ (index) │ Command                   │ Description                         │');
@@ -235,7 +257,9 @@ class TokenEditorUtility {
     console.log('└─────────┴───────────────────────────┴─────────────────────────────────────┘\n');
   }
 
-  // ✅ Handle token subcommands from KERNEL.js
+  /**
+   * ✅ Handle commands from CLI
+   */
   async handleCommand(arg, arg2) {
     const tCmds = ['edit', 'save', 'delete', 'help', 'load'];
 
@@ -282,7 +306,9 @@ class TokenEditorUtility {
     }
   }
 
-  // ✅ Ensure token exists on startup
+  /**
+   * ✅ Ensure token exists on startup
+   */
   async ensureTokenOnStartup() {
     const token = await this.loadTokenForStartup();
     if (!token) {
