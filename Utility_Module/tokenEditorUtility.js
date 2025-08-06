@@ -1,5 +1,5 @@
 //,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-// TokenEditorUtility.js — Enhanced Format + Usage Flags Support          |
+// TokenEditorUtility.js — Enhanced Command Handling + Startup Checks     |
 // Updated: 2025-08                                                        |
 //------------------------------------------------------------------------//
 
@@ -29,10 +29,11 @@ class TokenEditorUtility {
     console.log(this.osHelper.getInfoMessage());
     console.log(this.osHelper.getShellUsageNote());
 
-    // Ensure token.json is present on init
+    // Ensure token.json exists
     this.ensureTokenFileExists();
   }
 
+  // ✅ Ensure token.json exists and has required keys
   ensureTokenFileExists() {
     if (!fs.existsSync(tokenPath)) {
       this.writeTokenJson(DEFAULT_TOKEN_STRUCTURE);
@@ -40,7 +41,6 @@ class TokenEditorUtility {
       const tokens = this.readTokenJson();
       const missingKeys = Object.keys(DEFAULT_TOKEN_STRUCTURE).filter(k => !(k in tokens));
       if (missingKeys.length > 0) {
-        // Merge missing defaults without overwriting existing values
         this.writeTokenJson({ ...DEFAULT_TOKEN_STRUCTURE, ...tokens });
       }
     }
@@ -57,10 +57,10 @@ class TokenEditorUtility {
 
   validateToken(token) {
     if (!this.isValidTokenFormat(token)) {
-      return 'Error: ⛔️ Invalid token format. Please use a valid token format.';
+      return '⛔️ Invalid token format. Please use a valid token format.';
     }
     if (!this.isDiscordToken(token)) {
-      return 'Error: ⛔️ Token is not a Discord token. Please use a valid Discord token.';
+      return '⛔️ Token is not a Discord token. Please use a valid Discord token.';
     }
     return null;
   }
@@ -84,40 +84,49 @@ class TokenEditorUtility {
     }
   }
 
+  // ✅ Prompt user for token edit
   async editTokenInteractive() {
-    try {
-      const tokens = this.readTokenJson();
+  try {
+    const tokens = this.readTokenJson();
 
-      const token = await Prompt.ask({
-        promptTitle: '# token edit',
-        promptAsk: 'Enter your bot token.',
-        defaultValue: tokens.temp || tokens.save || ''
-      });
+    console.log('\n[INFO] Enter your bot token below (paste it fully and press Enter):\n');
 
-      this.unlockInput();
+    // Temporarily disable CLI parser and enable raw prompt
+    this.unlockInput(true); // ✅ Pass true to indicate “lock main parser”
 
-      if (!token || !token.trim()) {
-        console.log('[TOKEN] ⚠️ Token edit aborted or no data entered.');
-        return null;
-      }
+    const token = await this.prompt.ask({
+      promptTitle: '# token edit',
+      promptAsk: 'Bot Token:',
+      defaultValue: tokens.temp || tokens.save || '',
+      rawMode: true // ✅ Ensure Prompt.js doesn’t interpret as command
+    });
 
-      const errorMessage = this.validateToken(token);
-      if (errorMessage) {
-        console.log(`[TOKEN] ❌ ${errorMessage}`);
-        return null;
-      }
+    this.unlockInput(false); // ✅ Restore normal input mode
 
-      tokens.temp = token;
+    if (!token || !token.trim()) {
+      console.log('[TOKEN] ⚠️ Token edit aborted or no data entered.');
+      return null;
+    }
+
+    const errorMessage = this.validateToken(token);
+    if (errorMessage) {
+      console.log(`[TOKEN] ❌ ${errorMessage}`);
+      return null;
+    }
+
+      tokens.temp = token.trim();
       this.writeTokenJson(tokens);
       console.log('[TOKEN] ✅ Temp token set. Use `# token save` to persist.');
       return token;
     } catch (err) {
       console.error('[TOKEN] ❌ Error during token edit:', err);
-      this.unlockInput();
+      this.unlockInput(false);
       return null;
     }
   }
 
+
+  // ✅ Save temp token as permanent
   async saveTokenInteractive() {
     try {
       const tokens = this.readTokenJson();
@@ -151,42 +160,7 @@ class TokenEditorUtility {
     }
   }
 
-  async saveTokenPersistent(token = null) {
-    try {
-      if (!token) {
-        token = await this.prompt.ask({
-          promptTitle: '# token save',
-          promptAsk: 'Enter permanent bot token to save',
-          defaultValue: ''
-        });
-
-        if (!token || !token.trim()) {
-          console.log('[TOKEN] ❌ No token entered. Operation cancelled.');
-          return false;
-        }
-      }
-
-      const errorMessage = this.validateToken(token);
-      if (errorMessage) {
-        console.log(`[TOKEN] ❌ ${errorMessage}`);
-        return false;
-      }
-
-      const tokens = this.readTokenJson();
-      tokens.save = token;
-      tokens.temp = '';
-      tokens.loadtokensave = true;
-      tokens.loadtokentemp = false;
-
-      this.writeTokenJson(tokens);
-      console.log('[TOKEN] 🔐 Permanent token saved and activated.');
-      return true;
-    } catch (err) {
-      console.error('[TOKEN] ❌ Failed to save permanent token:', err);
-      return false;
-    }
-  }
-
+  // ✅ Delete tokens
   deleteToken({ all = false } = {}) {
     try {
       const tokens = this.readTokenJson();
@@ -210,27 +184,116 @@ class TokenEditorUtility {
     }
   }
 
-  async switchTokenMode(mode = 'temp') {
-    const tokens = this.readTokenJson();
-
-    if (mode === 'save') {
-      tokens.loadtokensave = true;
-      tokens.loadtokentemp = false;
-      console.log('[TOKEN] 🟢 Now using SAVED token at startup.');
-    } else {
+  // ✅ Enable saved or temp token for startup
+  enableTempToken() {
+    try {
+      const tokens = this.readTokenJson();
       tokens.loadtokentemp = true;
       tokens.loadtokensave = false;
-      console.log('[TOKEN] 🟢 Now using TEMPORARY token at startup.');
+      this.writeTokenJson(tokens);
+      console.log('[TOKEN] ✅ Using TEMPORARY token for startup.');
+      return true;
+    } catch (err) {
+      console.error('[TOKEN] ❌ Failed to enable temporary token:', err);
+      return false;
     }
-
-    this.writeTokenJson(tokens);
   }
 
+  enableSavedToken() {
+    try {
+      const tokens = this.readTokenJson();
+      tokens.loadtokensave = true;
+      tokens.loadtokentemp = false;
+      this.writeTokenJson(tokens);
+      console.log('[TOKEN] ✅ Using SAVED token for startup.');
+      return true;
+    } catch (err) {
+      console.error('[TOKEN] ❌ Failed to enable saved token:', err);
+      return false;
+    }
+  }
+
+  // ✅ Load token for startup
   async loadTokenForStartup() {
     const tokens = this.readTokenJson();
     if (tokens.loadtokentemp) return tokens.temp || null;
     if (tokens.loadtokensave) return tokens.save || null;
     return null;
+  }
+
+  // ✅ Show help table
+  showHelp() {
+    console.log('\n┌─────────┬───────────────────────────┬─────────────────────────────────────┐');
+    console.log('│ (index) │ Command                   │ Description                         │');
+    console.log('├─────────┼───────────────────────────┼─────────────────────────────────────┤');
+    console.log('│ 0       │ # token edit              │ Edit or set temporary token         │');
+    console.log('│ 1       │ # token save              │ Save temporary token as permanent   │');
+    console.log('│ 2       │ # token delete            │ Delete temporary and/or saved token │');
+    console.log('│ 3       │ # token load save.token   │ Use saved token at startup          │');
+    console.log('│ 4       │ # token load temp.token   │ Use temporary token at startup      │');
+    console.log('│ 5       │ # token help              │ Show this help menu                 │');
+    console.log('└─────────┴───────────────────────────┴─────────────────────────────────────┘\n');
+  }
+
+  // ✅ Handle token subcommands from KERNEL.js
+  async handleCommand(arg, arg2) {
+    const tCmds = ['edit', 'save', 'delete', 'help', 'load'];
+
+    if (!arg) {
+      console.log('\n[TOKEN] 💡 Use "# token help" for available subcommands.');
+      return;
+    }
+
+    if (!tCmds.includes(arg)) {
+      console.log(`[TOKEN] ❌ Unknown subcommand: "${arg}"`);
+      this.showHelp();
+      return;
+    }
+
+    if (arg === 'help') {
+      this.showHelp();
+      return;
+    }
+
+    if (arg === 'edit') {
+      await this.editTokenInteractive();
+      return;
+    }
+
+    if (arg === 'save') {
+      await this.saveTokenInteractive();
+      return;
+    }
+
+    if (arg === 'delete') {
+      this.deleteToken({ all: true });
+      return;
+    }
+
+    if (arg === 'load') {
+      if (!arg2) {
+        console.log('\n[TOKEN] 💡 Use "# token load [save.token | temp.token]"');
+        return;
+      }
+      if (arg2 === 'save.token') this.enableSavedToken();
+      else if (arg2 === 'temp.token') this.enableTempToken();
+      else console.log('[TOKEN] ❌ Invalid load option. Use "save.token" or "temp.token".');
+      return;
+    }
+  }
+
+  // ✅ Ensure token exists on startup
+  async ensureTokenOnStartup() {
+    const token = await this.loadTokenForStartup();
+    if (!token) {
+      console.log('[STARTUP] 🚨 No token found. Prompting user...');
+      const newToken = await this.editTokenInteractive();
+      if (!newToken) {
+        console.log('[STARTUP] ⚠️ No token provided. Continuing without bot startup.');
+      }
+    } else {
+      console.log('[STARTUP] ✔️ Token found. Use "# start" to launch.');
+    }
   }
 }
 
