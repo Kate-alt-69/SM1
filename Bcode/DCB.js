@@ -124,7 +124,7 @@ class Bot extends Client {
             // Get token
             const token = await this.tokenManager.loadToken();
             if (!token) {
-                throw new Error('[ERRPR] Failed to load token');
+                throw new Error('[ERROR] Failed to load token');
             }
 
             // Single ready event with all initialization

@@ -15,6 +15,7 @@ import CMDstart from './Utility_Module/CMDstart.js';
 import CMDstop from './Utility_Module/CMDstop.js';
 import Settings from './Utility_Module/FUNCTsetting.js';
 import { bcodePath, commandsJsonPath } from './defined/path-define.js';
+import { handleInput, toggleInput } from './Utility_Module/KNinput.manager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -49,10 +50,10 @@ if (!fs.existsSync(commandsJsonPath)) {
 }
 
 // ✅ Load Token Editor
-const { default: TokenEditorUtility } = await import('./Utility_Module/tokenEditorUtility.js');
-const tokenEditor = new TokenEditorUtility(() => (inputLocked = false));
-let inputLocked = false, promptVisible = false;
+const { default: TokenEditorUtility } = await import('./Utility_Module/FUNCTtokenEditorUtility.js');
+const tokenEditor = new TokenEditorUtility(() => toggleInput(true)); // Re-enable input after prompt
 
+let promptVisible = false;
 const showPrompt = (force = false) => {
   if (!promptVisible || force) {
     process.stdout.write('<<-');
@@ -97,12 +98,20 @@ const handleInvalidCommand = (scope, input, validList, usage) => {
 };
 
 // ✅ CLI Input
+let buffer = '';
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', async (data) => {
-  if (inputLocked) return;
+  if (!toggleInput) return; // Ignore if input is disabled
   clearPrompt();
 
-  const input = data.trim();
+  buffer += data;
+
+  // Wait until a newline before processing the command
+  if (!buffer.endsWith('\n')) return;
+
+  const input = buffer.trim();
+  buffer = '';
+
   const [main, sub, arg, arg2] = input.split(' ');
 
   if (main === '#') {
@@ -112,9 +121,10 @@ process.stdin.on('data', async (data) => {
     }
 
     if (sub === 'token') {
-      await tokenEditor.handleCommand(arg, arg2); // ✅ Full delegation
+      toggleInput(false); // Disable input while token editor runs
+      await tokenEditor.handleCommand(arg, arg2);
+      toggleInput(true);
     }
-
     else if (sub === 'toggle') {
       const ToggleManager = (await import('./Utility_Module/FUNCTtoggle.js')).default;
       if (!arg) {
@@ -129,41 +139,42 @@ process.stdin.on('data', async (data) => {
       else if (arg === 'snapshot') ToggleManager.takeSnapshot();
       else if (arg === 'rollback' && arg2) ToggleManager.rollbackSnapshot(arg2);
       else ToggleManager.toggleHelp();
-
-    } else if (sub === 'start') {
+    }
+    else if (sub === 'start') {
       await CMDstart();
-
-    } else if (sub === 'stop') {
+    }
+    else if (sub === 'stop') {
       await CMDstop({ stop: true });
       console.log('[STOP] 🛑 Bot stopped');
-
-    } else if (sub === 'restart') {
+    }
+    else if (sub === 'restart') {
       console.log('[RESTART] 🚀 Restarting...');
       await CMDstop({ restart: true });
       setTimeout(() => CMDstart(), 1000);
-
-    } else if (sub === 'help') {
+    }
+    else if (sub === 'help') {
       const commands = [
         { command: '# start', info: 'Start the bot' },
         { command: '# stop', info: 'Stop the bot' },
         { command: '# restart', info: 'Restart the bot' },
         { command: '# token help', info: 'Token management commands' },
         { command: '# toggle help', info: 'Command toggling commands' },
-        { command: '# setting help', info: 'Bot settings commands' }
+        { command: '# setting help', info: 'Bot settings commands' },
+        { command: 'how to shutdown', info: 'use the normal CTRL + C to shutdown whole process'}
       ];
 
-      console.log('\n┌─────────┬──────────────────────────┬───────────────────────────────────┐');
-      console.log('│ (index) │ Command                  │ Description                       │');
-      console.log('├─────────┼──────────────────────────┼───────────────────────────────────┤');
+      console.log('\n┌─────────┬──────────────────────────┬─────────────────────────────────────────────────────────┐');
+      console.log('│ (index) │ Command                  │ Description                                             │');
+      console.log('├─────────┼──────────────────────────┼─────────────────────────────────────────────────────────┤');
       commands.forEach((cmd, i) => {
         const idx = String(i).padEnd(7);
         const c = cmd.command.padEnd(24);
-        const d = cmd.info.padEnd(33);
+        const d = cmd.info.padEnd(55);
         console.log(`│ ${idx} │ ${c} │ ${d} │`);
       });
-      console.log('└─────────┴──────────────────────────┴───────────────────────────────────┘\n');
-
-    } else if (sub === 'setting') {
+      console.log('└─────────┴──────────────────────────┴─────────────────────────────────────────────────────────┘\n');
+    }
+    else if (sub === 'setting') {
       if (!arg) {
         console.log('\n[SETTING] 💡 Use "# setting help" for available subcommands.');
         return;
@@ -176,17 +187,18 @@ process.stdin.on('data', async (data) => {
       else if (arg === 'help') Settings.helpCmd();
       else console.log('[SETTING] list | about | runerror | cleanup | relaunch | help');
     }
-
-  } else if (main === '@') {
-    if (sub === 'shutdown') await shutdownProcess();
-    else handleInvalidCommand('@', sub, ['shutdown'], '@ shutdown');
-
-  } else {
+  }
+  else if (main === '@') {
+    if (sub === 'restart') await shutdownProcess();
+    else handleInvalidCommand('@', sub, ['restart'], '@ restart');
+  }
+  else {
     console.log(`[INPUT] ❌ Invalid input: "${input}"\n[INPUT] 💡 Commands start with '#' or '@'`);
   }
 
   showPrompt(true);
 });
+
 
 process.on('SIGINT', async () => {
   console.log('\n[CTRL+C] 🔌 Interrupt signal received (SIGINT)');
@@ -203,4 +215,4 @@ showPrompt(true);
 
 //,,,,,,,,,,,,,,,,,
 //END OF KERNEL.js |
-//```````````````
+//````````````
