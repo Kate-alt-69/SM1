@@ -10,7 +10,7 @@ import vm from 'vm';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const projectRoot = path.resolve(__dirname, '../../..'); // where KERNEL.js is
+const projectRoot = path.resolve(__dirname, '../../'); // where KERNEL.js is
 const bcodePath = path.join(projectRoot, 'Bcode');
 const logsDir = path.join(projectRoot, 'logs');
 

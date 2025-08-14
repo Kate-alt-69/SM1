@@ -1,11 +1,16 @@
 // ========================================
-// START init.runerror.js
+// START init.runerror.js (Updated)
 // ========================================
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Resolve current script directory (__dirname equivalent in ES modules)
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Paths
-const ereChkDir = path.resolve('./ERE_CHK');
+const ereChkDir = path.join(__dirname, 'ERE_CHK'); // Create inside current directory
 const runErrorFile = path.join(ereChkDir, 'runerror.json');
 
 // Ensure ERE_CHK directory exists

@@ -1,6 +1,5 @@
-//,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,
-// file.check.js — Full Project Diagnostic (Syntax + Var + Function Check) |
-// Updated: 2025-08                                                        |
+// file.check.js — Full Project Diagnostic (Syntax + Var + Function Check)
+// Updated: 2025-08
 //------------------------------------------------------------------------//
 
 import fs from 'fs';
@@ -32,13 +31,15 @@ const results = {
   passed: []
 };
 
-// ✅ Get all JS files from given directory (recursive)
+// ✅ Get all JS files from given directory (recursive, excluding node_modules)
 function getAllJsFiles(dir) {
   let files = [];
   for (const item of fs.readdirSync(dir)) {
     const fullPath = path.join(dir, item);
     const stat = fs.statSync(fullPath);
+
     if (stat.isDirectory()) {
+      if (item === 'node_modules') continue; // Skip node_modules
       files = files.concat(getAllJsFiles(fullPath));
     } else if (item.endsWith('.js')) {
       files.push(fullPath);
@@ -62,7 +63,7 @@ function checkVariables(filePath) {
   const content = fs.readFileSync(filePath, 'utf-8');
   const issues = [];
 
-  if (/(\bvar\b)/.test(content)) {
+  if (/\bvar\b/.test(content)) {
     issues.push('Uses "var" (prefer let/const)');
   }
 
@@ -101,14 +102,12 @@ function analyzeFunctions(filePath) {
 
     walk(ast);
 
-    // Check for missing function calls
     for (const fn of calledFunctions) {
       if (!declaredFunctions.has(fn) && fn !== 'console' && fn !== 'require') {
         issues.push(`Calls undefined function "${fn}"`);
       }
     }
 
-    // Check for duplicate functions
     const duplicates = [...declaredFunctions].filter((fn, idx, arr) => arr.indexOf(fn) !== idx);
     duplicates.forEach(fn => issues.push(`Duplicate function "${fn}"`));
 
@@ -124,27 +123,24 @@ function runChecks() {
   const files = [...getAllJsFiles(bcodePath), ...getAllJsFiles(utilsPath)];
   results.totalFiles = files.length;
 
-  console.log(`[CHECK] 🔍 Found ${files.length} JS files. Running advanced checks...\n`);
+  console.log(`[CHECK] 🔍 Found ${files.length} JS files (excluding node_modules). Running advanced checks...\n`);
 
   for (const file of files) {
     const relativePath = path.relative(projectRoot, file);
     let fileStatus = { file: relativePath, syntax: 'OK', vars: 'OK', functions: 'OK' };
 
-    // Syntax check
     const syntaxError = checkSyntax(file);
     if (syntaxError) {
       fileStatus.syntax = syntaxError;
       results.syntaxErrors.push(fileStatus);
     }
 
-    // Variable check
     const varIssues = checkVariables(file);
     if (varIssues.length > 0) {
       fileStatus.vars = varIssues.join('; ');
       results.varIssues.push(fileStatus);
     }
 
-    // Function check
     const functionIssues = analyzeFunctions(file);
     if (functionIssues.length > 0) {
       fileStatus.functions = functionIssues.join('; ');
@@ -160,7 +156,6 @@ function runChecks() {
   printSummary();
 }
 
-// ✅ Save report to /logs
 function saveReport() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const logFile = path.join(logsDir, `full_check_${timestamp}.txt`);
@@ -206,7 +201,6 @@ function saveReport() {
   console.log(`[LOG] ✅ Report saved to: ${logFile}`);
 }
 
-// ✅ Print summary to console
 function printSummary() {
   console.log('\n[CHECK SUMMARY]');
   console.log(`Total Files: ${results.totalFiles}`);
