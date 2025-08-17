@@ -1,8 +1,7 @@
 // CommandManager.js
-const fs = require('fs').promises;
-const path = require('path');
 const { checkCommandState } = require('./CommandExcutor');
 const { CommandLoader } = require('./CommandLoader');
+const path = require('path');
 
 class CommandManager {
     constructor(client) {
@@ -27,24 +26,18 @@ class CommandManager {
             console.log('[SYSTEM] 📝 Loading commands...');
             console.log('[SYSTEM] 🔄 Scanning command files...');
 
-            const files = await fs.readdir(this.commandsPath);
+            // Use CommandLoader to handle scanning + file loading
+            const loader = new CommandLoader(this.commandsPath);
+            const loadedCommands = await loader.loadCommands();
 
-            for (const file of files) {
-                if (!file.endsWith('.js')) continue;
-
+            for (const { command, filePath } of loadedCommands) {
                 try {
-                    const filePath = path.join(this.commandsPath, file);
-                    delete require.cache[require.resolve(filePath)];
-                    const command = require(filePath);
-
                     if (command.data?.name && command.execute) {
                         const parent = command.data.name;
                         const sub = parent;
 
                         const state = checkCommandState({ parent, full: sub });
-
-                        // ONLY skip if state is FALSE or contains disable code
-                        if (state && state.disabled === true) {
+                        if (state?.disabled) {
                             console.warn(`[COMMAND.DISABLED] ⛔ Skipped "${sub}": ${state.code}`);
                             this.stats.disabledCommands++;
                             continue;
@@ -65,18 +58,17 @@ class CommandManager {
                         }
 
                         this.commands.set(parent, command);
-                        console.log(`[SYSTEM] ✅ Loaded command: ${parent}`);
+                        console.log(`[SYSTEM] ✅ Loaded command: ${parent} (${path.relative(this.commandsPath, filePath)})`);
                     } else {
-                        console.warn(`{ERROR} ⚠️ Invalid command structure in ${file}`);
+                        console.warn(`{ERROR} ⚠️ Invalid command structure in ${path.basename(filePath)}`);
                         this.stats.skippedFiles++;
                     }
-                } catch (error) {
-                    console.error(`{FILE.ERROR} ❌ Failed to load ${file}:`, error.message);
+                } catch (err) {
+                    console.error(`{ERROR} ❌ Failed to process ${path.basename(filePath)}:`, err.message);
                     this.stats.failedCommands++;
 
-                    const commandLoader = new CommandLoader(this);
-                    const detailedError = await commandLoader.getDetailedError(file, error);
-                    console.error(detailedError);
+                    const detailedError = await loader.getDetailedError(filePath, err);
+                    console.error(`{ERROR} ${detailedError}`);
                 }
             }
 
@@ -90,7 +82,7 @@ class CommandManager {
 
             return await this.registerCommands();
         } catch (error) {
-            console.error('{ERROR} ❌ Failed to load commands:', error);
+            console.error(`{ERROR} ❌ Failed to load commands: ${error.message}`);
             return false;
         }
     }
@@ -117,7 +109,7 @@ class CommandManager {
             return true;
         } catch (error) {
             this.isRegistering = false;
-            console.error('[ERROR] ❌ Failed to register commands:', error);
+            console.error(`{ERROR} ❌ Failed to register commands: ${error.message}`);
             return false;
         }
     }

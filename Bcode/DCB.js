@@ -1,4 +1,5 @@
 process.title = 'DISCORDSERVERMANAGER';
+const fs = require('fs'); // Added to fix missing fs errors
 const path = require('path');
 require('./utils/moduleCHK').checkAndInstallModules(__dirname);
 const { Client, GatewayIntentBits, ActivityType, Collection } = require('discord.js');
@@ -11,6 +12,12 @@ const { devCheck } = require('./scripts/dev');
 const { EmojiCache } = require('./utils/EmojiCache');
 const { BotDataManager } = require('./utils/BotDataManager');
 const { DataSavingSystem } = require('./utils/dataSAVINGsystem');
+
+// Stub ConnectionManager to avoid undefined errors
+const ConnectionManager = {
+    checkInternet: async () => true,
+    waitForInternet: async () => {}
+};
 // Fix token loading and validation
 //async function loadToken() {
 //    try {
