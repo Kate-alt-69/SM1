@@ -1,10 +1,21 @@
 {
+  "__folders": {
+    "embed": [
+      "embed.list",
+      "embed.manager",
+      "embed.send"
+    ],
+    "sticky": [
+      "sticky.remove",
+      "sticky.set"
+    ]
+  },
+  "embed.folder": true,
+  "sticky.folder": true,
   "about": true,
   "console.report": true,
   "console.tell": true,
   "console.runtime": true,
-  "embed.create": true,
-  "embed.send": true,
   "emojitest": true,
   "fun.8ball": true,
   "fun.flip": true,
@@ -17,5 +28,10 @@
   "role.remove": true,
   "sticky": true,
   "utility.ping": true,
-  "utility.about": true
+  "utility.about": true,
+  "embed.manager": true,
+  "embed.send": true,
+  "embed.list": true,
+  "sticky.set": true,
+  "sticky.remove": true
 }

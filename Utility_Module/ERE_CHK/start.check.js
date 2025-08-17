@@ -33,6 +33,7 @@ let rawLogs = '';
 let errorLogs = [];
 let errorDetected = false;
 let safeguardTimeout = null;
+let cleanExitTimeout = null;
 
 // Spawn bot process silently with custom process title
 console.log(`[CHECK] ▶ Running bot in silent mode with custom process name (RUNERRORDISCORDSM1)...`);
@@ -49,6 +50,21 @@ const pidData = {
     STARTED_AT: getTimestamp()
 };
 fs.writeFileSync(pidFile, JSON.stringify(pidData, null, 2));
+
+// ⏱ 30s clean exit safeguard if no errors are detected
+cleanExitTimeout = setTimeout(() => {
+    if (!errorDetected) {
+        console.log(`[CHECK] ⏱ No errors detected in 30s. Shutting down bot process (PID: ${child.pid})...`);
+        try {
+            process.kill(child.pid, 'SIGKILL');
+            console.log(`[CHECK] ✅ Bot stopped after clean 30s run (no errors).`);
+        } catch (killErr) {
+            console.error(`[CHECK] ❌ Failed to kill process: ${killErr.message}`);
+        }
+        analyzeLogs(rawLogs); // still generate log
+        process.exit(0); // exit script too
+    }
+}, 30000);
 
 // Capture stdout
 child.stdout.on('data', (data) => {
@@ -89,6 +105,7 @@ function checkForErrors(text) {
 // Process when bot exits
 child.on('close', (code) => {
     if (safeguardTimeout) clearTimeout(safeguardTimeout);
+    if (cleanExitTimeout) clearTimeout(cleanExitTimeout);
     console.log(`[CHECK] Bot process exited with code ${code}`);
     analyzeLogs(rawLogs);
 });
