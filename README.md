@@ -13,7 +13,7 @@ with some features
 - Developer Mode for .env <br> *( please Us this format )*
 
 ~~~env
-#Remove '#' from 'MODE=DEV' to enable development mode.<br>
+#Remove '#' from 'MODE=DEV' to enable development mode.
 #Idea By K8
     #MODE=DEV
     TOKEN=your-bot-token-here
@@ -26,16 +26,16 @@ DEBUGGER=true
 - Command Excution Loging and/or Easier Debug
 - Dynamicly Starting up Command Files
   - how to Create (UPCOMING...)
+- Command Toggle via # toggle on <command.name>
 
 ## Upcoming*
 **!!These Features Maybe Still Coming (and/or i forgot to edit the README.md)!!**
-- GUI Interface
+- GUI Interface (in CLI or command line interface)
 - LocalHost Dashboard
-- LocalHost CLI
+- LocalHost CLI (Terminal)
 - [Galactic](https://galactichosting.net/) Hosting Connection
 - Bcode Folder Updates Via [Archive.org](https://archive.org/)
 - More Kernel Commands
-- Commands Toggle (on/off)
 - More bot Commands
 - Multi OS (Operating System) Support (it's hard)
 
@@ -54,14 +54,15 @@ youtube tutorials about it's functions so i started using [ChatGPT](https://chat
 and yes i did use chatgpt to cleanify my code a little bit since i was a bit lost but in the end it all works great <br>
 and at this time im writing this README.md im still making the jump to DCB-1.2.0 and trust me it's gonna be a MASSIVE jump <br>
 so where ware we yeah it was a bit hard for me to learn discord.js since i couldn't fine any good tutorils about the discord.js<br>since most of them ware jsut begginer lvl coding and i wanted a full on tutorial about discord.js and it's networking and API functions
-## Places You Can Fine K8 
+## Places You Can Find K8 
 - Discord you can send me a FR
 ```
   <309000404041547776>
 ```
 - [Instagram](https://www.instagram.com/dhwanksh/)<br>
   QR code<br>
- <img width="500" height="560" alt="dhwanksh_qr" src="https://github.com/user-attachments/assets/28e883a5-3060-4aca-bc55-de08e2b1b5af" /><br>
+ <img width="300" height="300" alt="dhwanksh_qr" src="https://github.com/user-attachments/assets/28e883a5-3060-4aca-bc55-de08e2b1b5af" /><br>
 - [Reddit](https://www.reddit.com/user/Helloiamkate_69/)<br>
 - [Spotify](https://open.spotify.com/user/31b35qefpdsqh2vt7feujr63mygq?si=046a37f1761e48bf)
+
 
