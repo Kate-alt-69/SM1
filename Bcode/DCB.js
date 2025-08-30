@@ -10,78 +10,15 @@ const { keepAlive } = require('./KA.js');
 const DevScripts = require('./utils/devScripts');
 const { devCheck } = require('./scripts/dev');
 const { EmojiCache } = require('./utils/EmojiCache');
-const { BotDataManager } = require('./utils/BotDataManager');
-const { DataSavingSystem } = require('./utils/dataSAVINGsystem');
+const { BotDataManager } = require('./utils/BotDataManager.js');
+const { DataSavingSystem } = require('./utils/DataSavingSystem');
 
 // Stub ConnectionManager to avoid undefined errors
 const ConnectionManager = {
     checkInternet: async () => true,
     waitForInternet: async () => {}
 };
-// Fix token loading and validation
-//async function loadToken() {
-//    try {
-//        if (process.env.TOKEN_SM) {
-//            console.log('Token [ENV] loaded using DEV mode');
-//            return process.env.TOKEN_SM;      
-//        }
-//        console.log('[env] Token no found in .env, loading from config/token.json');
-//        const data = await fs.readFile(
-//            path.join(__dirname, 'config', 'token.json'),
-//            'utf8'
-//        ); 
-//        const tokenData = JSON.parse(data);
-//        return tokenData.token;
-//    } catch (err) {
-//        console.error('Failed to load token:', err);
-//        return null;
-//    }
-//}
-class DataStorage {
-    constructor(bot) {
-        this.bot = bot;
-        this.dataFile = "bot_data.json";
-        this.bot.storedEmbeds = {};
-    }
 
-    async saveData() {
-        const data = {
-            stickyMessages: this.bot.stickyMessages,
-            stickyCooldowns: this.bot.stickyCooldowns,
-            guildStickyMessages: this.bot.guildStickyMessages || {},
-            serverInfo: this.bot.serverInfo,
-            storedEmbeds: this.bot.storedEmbeds
-        };
-
-        try {
-            await fs.writeFile(this.dataFile, JSON.stringify(data, null, 4));
-        } catch (e) {
-            console.error(`Error saving data: ${e}`);
-        }
-    }
-
-    async loadData() {
-        try {
-            const data = JSON.parse(await fs.readFile(this.dataFile, 'utf8'));
-            this.bot.stickyMessages = data.stickyMessages || {};
-            this.bot.stickyCooldowns = data.stickyCooldowns || {};
-            this.bot.guildStickyMessages = data.guildStickyMessages || {};
-            this.bot.serverInfo = data.serverInfo || {};
-            this.bot.storedEmbeds = data.storedEmbeds || {};
-        } catch (e) {
-            if (e.code === 'ENOENT') {
-                console.log("[SYSTEM] 📝 No existing data file found, starting fresh");
-                this.bot.storedEmbeds = {};
-            } else {
-                console.error(`{ERROR} loading data: ${e}`);
-            }
-        }
-    }
-
-    async autoSave() {
-        setInterval(() => this.saveData(), 300000); // Save every 5 minutes
-    }
-}
 class Bot extends Client {
     constructor() {
         super({
@@ -92,33 +29,27 @@ class Bot extends Client {
                 GatewayIntentBits.GuildMembers
             ]
         });
-
         this.tokenManager = new TokenManager();
         this.commandManager = new CommandManager(this);
-
         this.serverInfo = new Map();
         this.stickyMessages = new Map();
         this.stickyLastSent = new Map();
         this.chatRateTracker = new Map(); // Track message rates per channel
         this.stickyThresholds = new Map(); // Dynamic thresholds per channel
-
         this.buttonHandlers = new Collection();
         this.activeChannels = new Set(); // Track channels with sticky messages
-
         this.connectionCheckInterval = null;
-
         this.devMode = false;
-
+        // Initialize DataSavingSystem properly
+        this.dataSavingSystem = DataSavingSystem;
         // Initialize bot stats
         this.botStats = {
             commands: 0,
             mainCommands: 0,
             subCommands: 0
         };
-
         this.emojiCache = null;
     }
-
     async start() {
         try {
             console.log('[SYSTEM]🔄 Starting bot initialization...');
@@ -139,20 +70,14 @@ class Bot extends Client {
                 this.once('ready', async () => {
                     try {
                         clearTimeout(startupTimeout);
-
                         // 1. Initialize emoji cache
                         this.emojiCache = new EmojiCache(this);
                         await this.emojiCache.loadEmojis();
-
-                        // 2. Initialize commands
+                        // 2. Initialize data saving system
+                        await this.dataSavingSystem.ready();
+                        // 3. Initialize commands
                         await this.commandManager.loadCommands();
                         await this.commandManager.registerCommands();
-
-                        // 3. Initialize data saving system
-                        if (this.dataSavingSystem) {
-                            await this.dataSavingSystem.initialize();
-                        }
-
                         // 4. Display final status
                         console.log('\n===========================================');
                         console.log('              BOT STATUS                   ');
@@ -165,22 +90,18 @@ class Bot extends Client {
                         console.log(`🎮 Commands Total : ${this.commandManager.stats.totalCommands} (${this.commandManager.stats.mainCommands} main, ${this.commandManager.stats.subCommands} sub)`);
                         console.log(`💾 Data System    : ${this.dataSavingSystem?.initialized ? 'Loaded ✅' : 'Not Loaded ❌'}`);
                         console.log('===========================================\n Type "# stop" to stop from hosting');
-
                         resolve();
                     } catch (error) {
                         reject(error);
                     }
                 });
-
                 this.login(token).catch(reject);
             });
-
         } catch (error) {
             console.error('{ERROR} ❌ Startup error:', error);
             process.exit(1);
         }
     }
-
     startConnectionMonitoring() {
         // Check connection every 30 seconds
         this.connectionCheckInterval = setInterval(async () => {

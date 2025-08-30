@@ -1,5 +1,9 @@
 // ==========================================================================
 // CommandLoader.js — Loads parent command modules with folder scanning and detailed logging
+//  - Scans top-level files in commands/ and .js files in immediate subfolders
+//  - Does NOT recurse into child-child folders
+//  - Skips files whose base name starts with "--"
+//  - Preserves original behaviors (logging, commands.json parsing, detailed errors)
 // ==========================================================================
 
 const fs = require('fs').promises;
@@ -45,6 +49,7 @@ class CommandLoader {
     return mod && mod.default ? mod.default : mod;
   }
 
+  // legacy helper: recursive scan (kept for compatibility but NOT used by loadCommands)
   async _scanFolderCommands(folderPath) {
     const commands = [];
     const entries = await fs.readdir(folderPath);
@@ -73,6 +78,7 @@ class CommandLoader {
     ].join('\n');
   }
 
+  // Primary command loading entrypoint. Scans only one directory depth.
   async loadCommands() {
     await this.ensureClogFolder();
     const logLines = [];
@@ -85,15 +91,42 @@ class CommandLoader {
       const cfg = await this._readCommandsJson();
       const enabledKeys = new Set(Object.keys(cfg).filter(k => k !== '__folders' && !k.endsWith('.folder')));
 
+      // Build list of command files to load: top-level .js files and .js files in immediate subfolders
       const rootEntries = await fs.readdir(this.root);
       let allCommandFiles = [];
+
       for (const entry of rootEntries) {
         const fullPath = path.join(this.root, entry);
         const stat = fssync.statSync(fullPath);
-        if (stat.isFile() && entry.endsWith('.js')) allCommandFiles.push(fullPath);
-        if (stat.isDirectory()) allCommandFiles.push(...await this._scanFolderCommands(fullPath));
+
+        // Skip files or folders whose name starts with '--' (only applies to file basenames)
+        if (stat.isFile() && entry.endsWith('.js')) {
+          if (path.basename(entry).startsWith('--')) {
+            logLines.push(`{SKIP} Skipped file (prefixed with --): ${entry}`);
+            continue;
+          }
+          allCommandFiles.push(fullPath);
+        }
+
+        if (stat.isDirectory()) {
+          // Read immediate children only (do NOT recurse into sub-subfolders)
+          const subEntries = await fs.readdir(fullPath);
+          for (const subEntry of subEntries) {
+            const subFull = path.join(fullPath, subEntry);
+            const subStat = fssync.statSync(subFull);
+            if (subStat.isFile() && subEntry.endsWith('.js')) {
+              if (path.basename(subEntry).startsWith('--')) {
+                logLines.push(`{SKIP} Skipped file (prefixed with --): ${path.relative(this.root, subFull)}`);
+                continue;
+              }
+              allCommandFiles.push(subFull);
+            }
+            // If subEntry is a directory, we intentionally DO NOT descend here (no child-child folders)
+          }
+        }
       }
 
+      // Load each discovered command file
       for (const filePath of allCommandFiles) {
         try {
           const command = this._requireFresh(filePath);
@@ -105,6 +138,7 @@ class CommandLoader {
           const matchedKeys = [...enabledKeys].filter(k => this._parentFromKey(k) === command.data.name);
           logLines.push(`Loaded parent: ${command.data.name} -> ${path.relative(this.root, filePath)} | subkeys: [${matchedKeys.join(', ')}]`);
         } catch (err) {
+          // Provide a succinct load error in the main log and preserve the stack in detailed error if needed
           logLines.push(`{ERROR} LOAD ERROR: ${path.relative(this.root, filePath)} -> ${err.message}`);
         }
       }
@@ -120,6 +154,7 @@ class CommandLoader {
         '==================',
         ''
       ];
+
       await fs.writeFile(logFilePath, header.concat(logLines).join('\n'), 'utf8');
       console.log(`[Clog] ✅ Commands logged to ${logFileName}`);
       return Array.from(this.loadedMap.values());
