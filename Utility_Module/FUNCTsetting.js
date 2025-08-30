@@ -139,7 +139,7 @@ class SettingsManager {
     fs.writeFileSync(runErrorFile, JSON.stringify(data, null, 4));
   }
 
-  static async cleanUpSettings() {
+    static async cleanUpSettings() {
     const defaultToken = { temp: 'empty-token', save: 'empty-token', loadtokensave: false, loadtokentemp: false };
     let operationsPerformed = [];
 
@@ -154,7 +154,6 @@ class SettingsManager {
     });
     if (['y', 'yes'].includes(String(tempConfirm).toLowerCase())) {
       const tokenData = fs.existsSync(tokenPath) ? JSON.parse(fs.readFileSync(tokenPath, 'utf-8')) : { ...defaultToken };
-      // Preserve all existing keys, only change temp
       tokenData.temp = 'empty-token';
       fs.writeFileSync(tokenPath, JSON.stringify(tokenData, null, 2));
       operationsPerformed.push('🧹 Temp token set to "empty-token".');
@@ -169,13 +168,12 @@ class SettingsManager {
     });
     if (['y', 'yes'].includes(String(saveConfirm).toLowerCase())) {
       const tokenData = fs.existsSync(tokenPath) ? JSON.parse(fs.readFileSync(tokenPath, 'utf-8')) : { ...defaultToken };
-      // Preserve all existing keys, only change save
       tokenData.save = 'empty-token';
       fs.writeFileSync(tokenPath, JSON.stringify(tokenData, null, 2));
       operationsPerformed.push('🧹 Save token set to "empty-token".');
     }
 
-    // Commands Cleanup — regenerate using FUNCTtoggle (preserves intended behavior)
+    // Commands Cleanup
     const commandConfirm = await Prompt.new({
       promptID: 'cleanup-commands',
       title: 'CLEANUP CONFIRMATION',
@@ -184,7 +182,6 @@ class SettingsManager {
     });
     if (['y', 'yes'].includes(String(commandConfirm).toLowerCase())) {
       try {
-        // regenerateCommandJson calls createCommandsJson(true)
         CommandToggleManager.regenerateCommandJson();
         operationsPerformed.push('🧹 commands.json regenerated using FUNCTtoggle.');
       } catch (err) {
@@ -212,63 +209,64 @@ class SettingsManager {
       operationsPerformed.push('🧹 Snapshots deleted.');
     }
 
-    // Logs Cleanup — use logsPath from path-define.js if present, else fallback to <project-root>/logs
+    // Logs Cleanup
     const logsDir = logsPath && typeof logsPath === 'string' && logsPath.length ? logsPath : path.join(path.resolve(), 'logs');
-
     if (fs.existsSync(logsDir)) {
       try {
-        const logFiles = fs.readdirSync(logsDir).filter(f => {
-          const full = path.join(logsDir, f);
-          return fs.statSync(full).isFile();
-        });
-
+        const logFiles = fs.readdirSync(logsDir).filter(f => fs.statSync(path.join(logsDir, f)).isFile());
         if (logFiles.length > 0) {
-          // Map to objects with birthtime (creation) and name
-          const filesWithStats = logFiles.map(fname => {
-            const full = path.join(logsDir, fname);
-            const st = fs.statSync(full);
-            // Use birthtime if available, else ctime
-            const created = (typeof st.birthtimeMs === 'number' && st.birthtimeMs > 0) ? st.birthtimeMs : st.ctimeMs;
-            return { name: fname, full, created, createdDate: new Date(created) };
-          });
+          console.log('\n[LOGS] Found the following log files:');
+          logFiles.forEach((f, i) => console.log(`${i + 1}. ${f}`));
 
-          // Sort ascending (oldest first)
-          filesWithStats.sort((a, b) => a.created - b.created);
-
-          // Print list top -> bottom (oldest -> newest)
-          console.log('\n[LOGS] Found the following log files (oldest → newest):');
-          filesWithStats.forEach((f, i) => {
-            console.log(`${i + 1}. ${f.name}    —    ${f.createdDate.toLocaleString()}`);
-          });
-
-          // Ask user once to delete all listed logs
           const delLogsConfirm = await Prompt.new({
             promptID: 'cleanup-delete-logs',
             title: 'DELETE LOG FILES',
-            description: `Delete ALL ${filesWithStats.length} log files listed above? (y/n)`,
+            description: `Delete ALL ${logFiles.length} log files listed above? (y/n)`,
             defaultValue: 'n'
           });
 
           if (['y', 'yes'].includes(String(delLogsConfirm).toLowerCase())) {
-            for (const f of filesWithStats) {
-              try {
-                fs.unlinkSync(f.full);
-              } catch (err) {
-                console.warn(`[LOGS] Failed to delete ${f.name}: ${err.message}`);
-              }
-            }
-            operationsPerformed.push(`🧹 ${filesWithStats.length} log files deleted.`);
+            for (const f of logFiles) fs.unlinkSync(path.join(logsDir, f));
+            operationsPerformed.push(`🧹 ${logFiles.length} log files deleted.`);
           } else {
-            console.log('[LOGS] Skipped deleting logs.');
+            console.log('[LOGs] Skipped deleting logs.');
           }
         }
       } catch (err) {
-        console.error('[LOGS] Error while listing or deleting logs:', err.message);
+        console.error('{ERROR} Error while listing or deleting logs:', err.message);
+      }
+    }
+
+    // NEW: Clog Cleanup inside Bcode
+    const clogDir = path.join(bcodePath, 'Clog');
+    if (fs.existsSync(clogDir)) {
+      try {
+        const clogFiles = fs.readdirSync(clogDir).filter(f => fs.statSync(path.join(clogDir, f)).isFile());
+        if (clogFiles.length > 0) {
+          console.log('\n[CLOG] Found the following Clog files:');
+          clogFiles.forEach((f, i) => console.log(`${i + 1}. ${f}`));
+
+          const delClogConfirm = await Prompt.new({
+            promptID: 'cleanup-delete-clog',
+            title: 'DELETE CLOG FILES',
+            description: `Delete ALL ${clogFiles.length} files in Bcode/Clog? (y/n)`,
+            defaultValue: 'n'
+          });
+
+          if (['y', 'yes'].includes(String(delClogConfirm).toLowerCase())) {
+            for (const f of clogFiles) fs.unlinkSync(path.join(clogDir, f));
+            operationsPerformed.push(`🧹 ${clogFiles.length} files deleted from Bcode/Clog.`);
+          } else {
+            console.log('[CLOG] Skipped deleting Clog files.');
+          }
+        }
+      } catch (err) {
+        console.error('{ERROR} Error while listing or deleting Clog files:', err.message);
       }
     }
 
     if (operationsPerformed.length === 0) {
-      return '[CLEANUP] ❌ No operations performed.';
+      return '{ERROR} ❌ No operations performed.';
     }
 
     return `[CLEANUP] ✅ Done.\n` + operationsPerformed.join('\n');
