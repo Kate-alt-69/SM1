@@ -1,8 +1,8 @@
 // Bcode/commands/embed/default-embed-logic.js
-import { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } from "discord.js";
+const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require("discord.js");
 
 // Default embed templates used by the embed manager UI
-export const defaultEmbeds = {
+const defaultEmbeds = {
   manager: {
     id: "EMB.manager-page",
     embed: new EmbedBuilder()
@@ -26,3 +26,5 @@ export const defaultEmbeds = {
     components: [],
   },
 };
+
+module.exports = { defaultEmbeds };

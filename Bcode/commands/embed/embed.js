@@ -1,11 +1,7 @@
 // Bcode/commands/embed/embed.js
 const { SlashCommandBuilder } = require('discord.js');
-const {
-  execute: handleManager,
-  handleSelect,
-  handleButton,
-  handleModal,
-} = require('./embed-commands/--command-manager.js'); // updated path
+const { DataSavingSystem: DSS } = require('../../utils/DataSavingSystem.js');
+const commandManager = require('./embed-commands/--command-manager.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -32,19 +28,13 @@ module.exports = {
     try {
       switch (sub) {
         case 'manager':
-          await handleManager(interaction); // directly calls command-manager.js execute
-          break;
-
+          return await commandManager.execute(interaction);
         case 'send':
-          // TODO: hook this into DSS like in command-manager.js
-          await interaction.reply({ content: '📤 Send/embed feature not implemented yet.', ephemeral: true });
+          await this.handleSend(interaction);
           break;
-
         case 'list':
-          // TODO: hook this into DSS like in command-manager.js
-          await interaction.reply({ content: '📂 Listing embeds is not implemented yet.', ephemeral: true });
+          await this.handleList(interaction);
           break;
-
         default:
           await interaction.reply({ content: '❌ Unknown subcommand', ephemeral: true });
       }
@@ -57,5 +47,8 @@ module.exports = {
         });
       }
     }
-  }
+  },
+
+  // Use the manager's interaction handler
+  handleInteraction: commandManager.handleInteraction
 };

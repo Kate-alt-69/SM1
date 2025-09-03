@@ -1,34 +1,21 @@
 {
-  "embeds": {
-    "serverEmbeds": {
-      "SERVER_ID": {
-        "embeds": {
-          "EMBED_NAME": {
-            "title": "Embed Title",
-            "description": "Embed Description",
-            "color": "0x0099ff",
-            "author": {
-              "name": null,
-              "iconURL": null
-            },
-            "footer": {
-              "text": null,
-              "iconURL": null
-            },
-            "thumbnail": null,
-            "image": null,
-            "fields": [],
-            "createdBy": "USER_ID",
-            "createdAt": "TIMESTAMP",
-            "lastModified": "TIMESTAMP"
-          }
-        }
+  "activeEditors": {
+    "messageID": {
+      "userID": "",
+      "messageID": "",
+      "channelID": "",
+      "startTime": "",
+      "expiresAt": "",
+      "state": "editing",
+      "embedData": {
+        "title": "",
+        "description": "",
+        "color": "",
+        "fields": []
       }
-    },
-    "globalEmbeds": [],
-    "metadata": {
-      "lastUpdated": "TIMESTAMP",
-      "version": "1.0"
     }
+  },
+  "metadata": {
+    "lastCleanup": ""
   }
 }
