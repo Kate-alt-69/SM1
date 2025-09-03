@@ -1,0 +1,59 @@
+{
+  "lastUpdate": "2025-09-03T14:21:18.864Z",
+  "version": "1.0",
+  "stats": {
+    "fileCount": 28,
+    "mainCommands": 13,
+    "subCommands": 0,
+    "subCommandGroups": 0,
+    "totalCommands": 13,
+    "failedCommands": 0,
+    "skippedFiles": 2,
+    "disabledCommands": 0,
+    "categories": {}
+  },
+  "loadedCommands": [
+    "about",
+    "console",
+    "embed",
+    "emojitest",
+    "fun",
+    "help",
+    "kick",
+    "ping",
+    "create",
+    "role",
+    "sticky",
+    "utility"
+  ],
+  "categories": {
+    "commands": {
+      "count": 11,
+      "commands": [
+        "about",
+        "console",
+        "emojitest",
+        "fun",
+        "help",
+        "kick",
+        "ping",
+        "create",
+        "role",
+        "sticky",
+        "utility"
+      ]
+    },
+    "embed": {
+      "count": 1,
+      "commands": [
+        "embed"
+      ]
+    },
+    "sticky": {
+      "count": 1,
+      "commands": [
+        "sticky"
+      ]
+    }
+  }
+}

@@ -1,7 +1,8 @@
 // CommandManager.js
-const { checkCommandState } = require('./CommandExcutor');
-const { CommandLoader } = require('./CommandLoader');
 const path = require('path');
+const fs = require('fs');
+const CommandExcutor = require('./CommandExcutor');
+const { CommandLoader } = require('./CommandLoader');
 
 class CommandManager {
     constructor(client) {
@@ -18,73 +19,77 @@ class CommandManager {
         };
         this.commandsPath = path.join(__dirname, '../commands');
         this.isRegistering = false;
+        this.loader = null;
+        this.checkCommandState = CommandExcutor.checkCommandState;
         console.log('[SYSTEM] 📝 CommandManager: Initializing...');
     }
 
     async loadCommands() {
         try {
             console.log('[SYSTEM] 📝 Loading commands...');
-            console.log('[SYSTEM] 🔄 Scanning command files...');
+            
+            // Initialize loader with client reference
+            this.loader = new CommandLoader(this.commandsPath, this.client);
+            
+            // Ensure commands directory exists
+            if (!fs.existsSync(this.commandsPath)) {
+                console.error(`{ERROR} Commands directory not found: ${this.commandsPath}`);
+                return false;
+            }
 
-            // Use CommandLoader to handle scanning + file loading
-            const loader = new CommandLoader(this.commandsPath);
-            const loadedCommands = await loader.loadCommands();
+            const loadedCommands = await this.loader.loadCommands();
+            if (!loadedCommands || !Array.isArray(loadedCommands)) {
+                console.error('{ERROR} Failed to load commands: Invalid response from loader');
+                return false;
+            }
 
+            // Clear existing commands and stats
+            this.commands.clear();
+            this.resetStats();
+
+            // Process loaded commands
             for (const { command, filePath } of loadedCommands) {
                 try {
-                    if (command.data?.name && command.execute) {
-                        const parent = command.data.name;
-                        const sub = parent;
-
-                        const state = checkCommandState({ parent, full: sub });
-                        if (state?.disabled) {
-                            console.warn(`[COMMAND.DISABLED] ⛔ Skipped "${sub}": ${state.code}`);
-                            this.stats.disabledCommands++;
-                            continue;
-                        }
-
-                        this.stats.mainCommands++;
-
-                        if (command.data.options) {
-                            command.data.options.forEach(opt => {
-                                if (opt.type === 1) this.stats.subCommands++;
-                                if (opt.type === 2) {
-                                    this.stats.subCommandGroups++;
-                                    opt.options?.forEach(subOpt => {
-                                        if (subOpt.type === 1) this.stats.subCommands++;
-                                    });
-                                }
-                            });
-                        }
-
-                        this.commands.set(parent, command);
-                        console.log(`[SYSTEM] ✅ Loaded command: ${parent} (${path.relative(this.commandsPath, filePath)})`);
-                    } else {
-                        console.warn(`{ERROR} ⚠️ Invalid command structure in ${path.basename(filePath)}`);
+                    if (!command?.data?.name || typeof command.execute !== 'function') {
                         this.stats.skippedFiles++;
+                        continue;
+                    }
+
+                    const parent = command.data.name;
+                    this.commands.set(parent, command);
+                    this.stats.mainCommands++;
+
+                    // Count subcommands
+                    if (command.data.options) {
+                        command.data.options.forEach(opt => {
+                            if (opt.type === 1) this.stats.subCommands++;
+                            if (opt.type === 2) this.stats.subCommandGroups++;
+                        });
                     }
                 } catch (err) {
-                    console.error(`{ERROR} ❌ Failed to process ${path.basename(filePath)}:`, err.message);
                     this.stats.failedCommands++;
-
-                    const detailedError = await loader.getDetailedError(filePath, err);
-                    console.error(`{ERROR} ${detailedError}`);
                 }
             }
 
             this.stats.totalCommands = this.stats.mainCommands + this.stats.subCommands;
+            return true;
 
-            console.log('[SYSTEM]\n📊 Command loading complete:');
-            console.log(`            ✅ Loaded: ${this.stats.totalCommands} (${this.stats.mainCommands} main, ${this.stats.subCommands} sub)`);
-            console.log(`            ⛔ Disabled: ${this.stats.disabledCommands}`);
-            console.log(`            ❌ Failed: ${this.stats.failedCommands}`);
-            console.log(`            ⏭️ Skipped: ${this.stats.skippedFiles}\n`);
-
-            return await this.registerCommands();
         } catch (error) {
             console.error(`{ERROR} ❌ Failed to load commands: ${error.message}`);
             return false;
         }
+    }
+
+    resetStats() {
+        this.stats = {
+            totalCommands: 0,
+            mainCommands: 0,
+            subCommands: 0,
+            subCommandGroups: 0,
+            failedCommands: 0,
+            skippedFiles: 0,
+            disabledCommands: 0
+        };
     }
 
     async registerCommands() {
@@ -114,5 +119,4 @@ class CommandManager {
         }
     }
 }
-
 module.exports = { CommandManager };

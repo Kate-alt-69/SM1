@@ -2,10 +2,17 @@
 // CommandExecutor.js — Command Execution + Error Handling (Folder & Flat JSON Support)
 //==========================================================================
 
-import fs from 'fs';
-import path from 'path';
-import { commandsJsonPath } from '../../defined/path-define.js';
-import { ErrorCodes, getErrorMessage } from './ErrorCodes.js';
+const fs = require('fs');
+const path = require('path');
+
+// Fix path to commands.json
+const commandsJsonPath = path.join(__dirname, '..', 'config', 'commands.json');
+const { ErrorCodes } = require('./ErrorCodes.js');
+
+// Replace import/export with CommonJS
+function getErrorMessage(code, details = '') {
+    return `Error ${code}: ${details || ErrorCodes[code] || 'Unknown error'}`;
+}
 
 function loadCommandsJson() {
   if (!fs.existsSync(commandsJsonPath)) {
@@ -120,8 +127,9 @@ async function executeCommand({ parent, name, ctx }) {
   }
 }
 
-export {
+module.exports = {
   isCommandEnabled,
   checkCommandState,
-  executeCommand
+  executeCommand,
+  getErrorMessage
 };

@@ -1,22 +1,36 @@
 process.title = 'DISCORDSERVERMANAGER';
-const fs = require('fs'); // Added to fix missing fs errors
+const fs = require('fs');
 const path = require('path');
 require('./utils/moduleCHK').checkAndInstallModules(__dirname);
-const { Client, GatewayIntentBits, ActivityType, Collection } = require('discord.js');
+const { Client, GatewayIntentBits, Collection } = require('discord.js');
 const { TokenManager } = require('./utils/TokenManager');
 const { CommandManager } = require('./utils/CommandManager');
 const { keepAlive } = require('./KA.js');
-//const { ConnectionManager } = require('./utils/ConnectionManager');
-const DevScripts = require('./utils/devScripts');
-const { devCheck } = require('./scripts/dev');
 const { EmojiCache } = require('./utils/EmojiCache');
 const { BotDataManager } = require('./utils/BotDataManager.js');
 const { DataSavingSystem } = require('./utils/DataSavingSystem');
 
-// Stub ConnectionManager to avoid undefined errors
+// Simple connection check before login
 const ConnectionManager = {
-    checkInternet: async () => true,
-    waitForInternet: async () => {}
+    checkInternet: async () => {
+        try {
+            await require('dns').promises.lookup('google.com');
+            return true;
+        } catch {
+            return false;
+        }
+    },
+    waitForInternet: async () => {
+        while (true) {
+            if (await ConnectionManager.checkInternet()) {
+                console.log('[SYSTEM] ✅ Internet connection ready');
+                break;
+            }
+            console.log('{ERROR} No internet connection!');
+            console.log('Check connection and press Enter to retry...');
+            await new Promise(resolve => process.stdin.once('data', resolve));
+        }
+    }
 };
 
 class Bot extends Client {
@@ -53,43 +67,30 @@ class Bot extends Client {
     async start() {
         try {
             console.log('[SYSTEM]🔄 Starting bot initialization...');
+            
+            // Check internet before proceeding
+            await ConnectionManager.waitForInternet();
 
-            // Add startup timeout
             const startupTimeout = setTimeout(() => {
-                throw new Error('[ERROR] Bot startup timed out after 60 seconds');
+                throw new Error('{ERROR} Bot startup timed out after 60 seconds');
             }, 60000);
 
-            // Get token
             const token = await this.tokenManager.loadToken();
             if (!token) {
-                throw new Error('[ERROR] Failed to load token');
+                throw new Error('{ERROR} Failed to load token');
             }
 
-            // Single ready event with all initialization
             await new Promise((resolve, reject) => {
                 this.once('ready', async () => {
                     try {
                         clearTimeout(startupTimeout);
-                        // 1. Initialize emoji cache
-                        this.emojiCache = new EmojiCache(this);
-                        await this.emojiCache.loadEmojis();
-                        // 2. Initialize data saving system
-                        await this.dataSavingSystem.ready();
-                        // 3. Initialize commands
-                        await this.commandManager.loadCommands();
-                        await this.commandManager.registerCommands();
-                        // 4. Display final status
-                        console.log('\n===========================================');
-                        console.log('              BOT STATUS                   ');
-                        console.log('===========================================');
-                        console.log(`📊 Servers In     : ${this.guilds.cache.size}`);
-                        console.log(`🤖 Logged in As   : ${this.user.tag}`);
-                        console.log(`🆔 Bot ID         : ${this.user.id}`);
-                        console.log(`🔑 Logged in with : ${this.tokenManager.getTokenInfo().maskedToken} ${this.tokenManager.getTokenInfo().source}`);
-                        console.log(`📁 Loaded CF      : ${this.commandManager.stats.mainCommands}`);
-                        console.log(`🎮 Commands Total : ${this.commandManager.stats.totalCommands} (${this.commandManager.stats.mainCommands} main, ${this.commandManager.stats.subCommands} sub)`);
-                        console.log(`💾 Data System    : ${this.dataSavingSystem?.initialized ? 'Loaded ✅' : 'Not Loaded ❌'}`);
-                        console.log('===========================================\n Type "# stop" to stop from hosting');
+                        await this.initializeSystems();
+                        
+                        // Add final delay before showing status
+                        console.log('[SYSTEM] 🕒 Preparing to display status...');
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        
+                        this.displayEnhancedStatus();
                         resolve();
                     } catch (error) {
                         reject(error);
@@ -98,9 +99,88 @@ class Bot extends Client {
                 this.login(token).catch(reject);
             });
         } catch (error) {
-            console.error('{ERROR} ❌ Startup error:', error);
+            console.error('{ERROR} Startup error:', error);
             process.exit(1);
         }
+    }
+
+    async initializeSystems() {
+        console.log('[SYSTEM] 🔄 Starting initialization sequence...');
+        
+        try {
+            // Phase 1: Core Services & Directory Setup
+            console.log('[SYSTEM] 💾 Setting up core services...');
+            this.emojiCache = new EmojiCache(this);
+            await this.emojiCache.init();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            console.log('[SYSTEM] ✅ Core services initialized');
+
+            // Phase 2: Data Systems
+            console.log('[SYSTEM] 📦 Initializing data systems...');
+            await this.dataSavingSystem.ready();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            console.log('[SYSTEM] ✅ Data systems ready');
+
+            // Phase 3: Load Resources
+            console.log('[SYSTEM] 🔄 Loading resources...');
+            await this.emojiCache.loadEmojis();
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            console.log('[SYSTEM] ✅ Resources loaded');
+
+            // Phase 4: Commands
+            console.log('[SYSTEM] 📝 Loading commands...');
+            const commandsLoaded = await this.commandManager.loadCommands();
+            if (!commandsLoaded) {
+                throw new Error('Failed to load commands');
+            }
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            console.log('[SYSTEM] ✅ Commands ready');
+
+            // Phase 5: Verify Systems
+            console.log('[SYSTEM] 🔍 Verifying systems...');
+            const checks = {
+                dataSystem: this.dataSavingSystem?.initialized,
+                commands: this.commandManager?.commands?.size > 0,
+                emojis: this.emojiCache?.staticEmojis?.size >= 0
+            };
+
+            const failed = Object.entries(checks)
+                .filter(([_, v]) => !v)
+                .map(([k]) => k);
+
+            if (failed.length > 0) {
+                throw new Error(`Systems failed verification: ${failed.join(', ')}`);
+            }
+
+            console.log('[SYSTEM] ✅ All systems verified');
+            return true;
+        } catch (error) {
+            console.error(`{ERROR} Initialization failed: ${error.message}`);
+            throw error;
+        }
+    }
+
+    displayEnhancedStatus() {
+        const tokenInfo = this.tokenManager.getTokenInfo();
+        const stats = this.commandManager.stats;
+        
+        console.log('\n===========================================');
+        console.log('              BOT STATUS                   ');
+        console.log('===========================================');
+        console.log(`📊 Servers         : ${this.guilds.cache.size}`);
+        console.log(`🤖 Bot Info        : ${this.user.tag} (ID: ${this.user.id})`);
+        console.log(`🔑 Token Source    : ${tokenInfo.source}`);
+        console.log('📁 Command Stats');
+        console.log(`   • Files         : ${stats.fileCount}`);
+        console.log(`   • Main Commands : ${stats.mainCommands}`);
+        console.log(`   • Subcommands   : ${stats.subCommands}`);
+        console.log(`   • Groups        : ${stats.subCommandGroups}`);
+        console.log(`   • Total         : ${stats.totalCommands}`);
+        console.log('💾 Systems Status');
+        console.log(`   • DSS           : ${this.dataSavingSystem?.initialized ? '✅' : '❌'}`);
+        console.log(`   • BDM           : ${this.botDataManager?.initialized ? '✅' : '⚪'}`);
+        console.log('===========================================');
+        console.log('Type "# stop" to stop from hosting\n');
     }
     startConnectionMonitoring() {
         // Check connection every 30 seconds
@@ -259,20 +339,24 @@ class Bot extends Client {
                 await handler(interaction);
                 return;
             }
-        } else if (interaction.isModalSubmit()) {
+
+            // Handle embed-related buttons
             const command = this.commandManager.commands.get('embed');
-            if (command && interaction.customId.startsWith('embed-')) {
-                await command.handleModalSubmit(interaction);
+            if (command && (
+                interaction.customId.startsWith('embed-') ||
+                interaction.customId.startsWith('edit_') ||
+                interaction.customId === 'confirm' ||
+                interaction.customId === 'add_file'
+            )) {
+                await command.handleButton(interaction);
                 return;
             }
         }
 
-        if (interaction.isButton()) {
+        if (interaction.isModalSubmit() && interaction.customId.startsWith('embed-')) {
             const command = this.commandManager.commands.get('embed');
-            if (command && interaction.customId.startsWith('edit_') || 
-                interaction.customId === 'confirm' || 
-                interaction.customId === 'add_file') {
-                await command.handleButton(interaction);
+            if (command) {
+                await command.handleModalSubmit(interaction);
                 return;
             }
         }

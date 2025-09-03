@@ -3,6 +3,7 @@ const path = require('path');
 
 class EmojiCache {
     constructor(client) {
+        if (!client) throw new Error('Client is required for EmojiCache');
         this.client = client;
         this.staticEmojis = new Map();
         this.animatedEmojis = new Map();
@@ -11,7 +12,22 @@ class EmojiCache {
         this.animatedFile = path.join(this.dataPath, 'animated_emojis.json');
     }
 
+    async init() {
+        try {
+            await fs.mkdir(this.dataPath, { recursive: true });
+            this.emojis = new Map(); // Initialize emojis map
+            return true;
+        } catch (error) {
+            console.error('{ERROR} Failed to initialize EmojiCache:', error);
+            return false;
+        }
+    }
+
     async loadEmojis() {
+        if (!this.client?.emojis?.cache) {
+            throw new Error('Discord client not ready - cannot load emojis');
+        }
+
         console.log('\n[SYSTEM] 🔄 Loading application emojis...');
         
         try {
@@ -65,7 +81,10 @@ class EmojiCache {
             return true;
         } catch (error) {
             console.error('{ERROR} ❌ Error loading emojis:', error);
-            return false;
+            // Return empty cache rather than false
+            this.staticEmojis.clear();
+            this.animatedEmojis.clear();
+            return true; // Don't fail startup for emoji issues
         }
     }
 

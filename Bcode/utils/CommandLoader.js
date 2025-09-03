@@ -1,21 +1,36 @@
 // ==========================================================================
-// CommandLoader.js — Loads parent command modules with folder scanning and detailed logging
-//  - Scans top-level files in commands/ and .js files in immediate subfolders
-//  - Does NOT recurse into child-child folders
-//  - Skips files whose base name starts with "--"
-//  - Preserves original behaviors (logging, commands.json parsing, detailed errors)
+// CommandLoader.js — Expanded version (with explicit arrays, A–Z sorting, JSON-like log format)
 // ==========================================================================
 
 const fs = require('fs').promises;
 const fssync = require('fs');
 const path = require('path');
+const CLOAD_PATH = path.join(__dirname, '..', 'config', 'CLOAD.json');
 
 class CommandLoader {
   constructor(commandsRootPath, client = null) {
     this.root = commandsRootPath || path.join(__dirname, '..', 'commands');
     this.client = client;
-    this.loadedMap = new Map(); // parentName -> { command, filePath }
+    this.loadedMap = new Map();
     this.clogFolder = path.join(__dirname, '..', 'Clog');
+    this.stats = {
+      fileCount: 0,
+      mainCommands: 0,
+      subCommands: 0,
+      subCommandGroups: 0,
+      totalCommands: 0,
+      failedCommands: 0,
+      skippedFiles: 0,
+      disabledCommands: 0,
+      categories: new Map()
+    };
+
+    this.cloadData = {
+      lastUpdate: '',
+      version: '1.0',
+      stats: this.stats,
+      loadedCommands: []
+    };
   }
 
   async ensureClogFolder() {
@@ -33,14 +48,7 @@ class CommandLoader {
     const p = this._commandsJsonPath();
     if (!fssync.existsSync(p)) throw new Error(`{ERROR} commands.json not found at ${p}`);
     const raw = await fs.readFile(p, 'utf8');
-    try { return JSON.parse(raw); } catch (err) {
-      throw new Error(`{ERROR} Failed to parse commands.json -> ${err.message}`);
-    }
-  }
-
-  _parentFromKey(cmdKey) {
-    const i = cmdKey.indexOf('.');
-    return i === -1 ? cmdKey : cmdKey.slice(0, i);
+    return JSON.parse(raw);
   }
 
   _requireFresh(filePath) {
@@ -49,49 +57,54 @@ class CommandLoader {
     return mod && mod.default ? mod.default : mod;
   }
 
-  // legacy helper: recursive scan (kept for compatibility but NOT used by loadCommands)
-  async _scanFolderCommands(folderPath) {
-    const commands = [];
-    const entries = await fs.readdir(folderPath);
-    for (const entry of entries) {
-      const fullPath = path.join(folderPath, entry);
-      const stat = fssync.statSync(fullPath);
-      if (stat.isFile() && entry.endsWith('.js')) commands.push(fullPath);
-      if (stat.isDirectory()) commands.push(...await this._scanFolderCommands(fullPath));
+  async _trackCommandStats(command, filePath) {
+    this.stats.mainCommands++;
+    const category = path.basename(path.dirname(filePath));
+    if (!this.stats.categories.has(category)) {
+      this.stats.categories.set(category, { count: 0, commands: [] });
     }
-    return commands;
+    this.stats.categories.get(category).count++;
+    this.stats.categories.get(category).commands.push(command.data.name);
+
+    if (command.data.options) {
+      command.data.options.forEach(opt => {
+        if (opt.type === 1) this.stats.subCommands++;
+        if (opt.type === 2) {
+          this.stats.subCommandGroups++;
+          opt.options?.forEach(subOpt => { if (subOpt.type === 1) this.stats.subCommands++; });
+        }
+      });
+    }
+
+    this.stats.totalCommands = this.stats.mainCommands + this.stats.subCommands;
+    this.stats.fileCount++;
   }
 
-  async getDetailedError(filePath, err) {
-    const rel = path.relative(this.root, filePath);
-    return [
-      '────────────────────────────────────────────────────────────────',
-      '{ERROR} CommandLoader Detailed Error',
-      `Module: ${rel}`,
-      `Path:   ${filePath}`,
-      `Error:  ${err?.stack || err?.message || String(err)}`,
-      'Suggestions:',
-      '- Ensure the file exports { data, execute }',
-      '- Ensure "data" is a SlashCommandBuilder with .name set',
-      '- Fix any syntax/runtime errors in the command file',
-      '────────────────────────────────────────────────────────────────'
-    ].join('\n');
+  async _saveCloadData() {
+    const data = {
+      ...this.cloadData,
+      lastUpdate: new Date().toISOString(),
+      stats: this.stats,
+      categories: Object.fromEntries(this.stats.categories),
+      loadedCommands: Array.from(this.loadedMap.keys())
+    };
+    await fs.writeFile(CLOAD_PATH, JSON.stringify(data, null, 2));
   }
 
-  // Primary command loading entrypoint. Scans only one directory depth.
   async loadCommands() {
     await this.ensureClogFolder();
-    const logLines = [];
     const now = new Date();
     const timestamp = now.toISOString().replace(/[:.]/g, '-');
     const logFileName = `load-log-${timestamp}.txt`;
     const logFilePath = path.join(this.clogFolder, logFileName);
 
-    try {
-      const cfg = await this._readCommandsJson();
-      const enabledKeys = new Set(Object.keys(cfg).filter(k => k !== '__folders' && !k.endsWith('.folder')));
+    const loadedLogs = [];
+    const failedLogs = [];
+    const skippedLogs = [];
 
-      // Build list of command files to load: top-level .js files and .js files in immediate subfolders
+    try {
+      await this._readCommandsJson();
+
       const rootEntries = await fs.readdir(this.root);
       let allCommandFiles = [];
 
@@ -99,49 +112,73 @@ class CommandLoader {
         const fullPath = path.join(this.root, entry);
         const stat = fssync.statSync(fullPath);
 
-        // Skip files or folders whose name starts with '--' (only applies to file basenames)
         if (stat.isFile() && entry.endsWith('.js')) {
-          if (path.basename(entry).startsWith('--')) {
-            logLines.push(`{SKIP} Skipped file (prefixed with --): ${entry}`);
+          if (entry.startsWith('--')) {
+            skippedLogs.push({ name: entry, line: `{SKIP} Skipped file (logic): ${entry}` });
             continue;
           }
           allCommandFiles.push(fullPath);
         }
 
         if (stat.isDirectory()) {
-          // Read immediate children only (do NOT recurse into sub-subfolders)
           const subEntries = await fs.readdir(fullPath);
           for (const subEntry of subEntries) {
             const subFull = path.join(fullPath, subEntry);
             const subStat = fssync.statSync(subFull);
             if (subStat.isFile() && subEntry.endsWith('.js')) {
-              if (path.basename(subEntry).startsWith('--')) {
-                logLines.push(`{SKIP} Skipped file (prefixed with --): ${path.relative(this.root, subFull)}`);
+              if (subEntry.startsWith('--')) {
+                skippedLogs.push({ name: subEntry, line: `{SKIP} Skipped file (logic): ${path.relative(this.root, subFull)}` });
                 continue;
               }
               allCommandFiles.push(subFull);
             }
-            // If subEntry is a directory, we intentionally DO NOT descend here (no child-child folders)
           }
         }
       }
 
-      // Load each discovered command file
+      this.stats.fileCount = allCommandFiles.length;
+      this.stats.mainCommands = 0;
+      this.stats.subCommands = 0;
+
       for (const filePath of allCommandFiles) {
         try {
           const command = this._requireFresh(filePath);
-          if (!command || !command.data || !command.data.name || typeof command.execute !== 'function') {
-            logLines.push(`{ERROR} INVALID EXPORT: ${path.relative(this.root, filePath)}`);
-            continue;
+          if (this._validateCommand(command, filePath)) {
+            await this._trackCommandStats(command, filePath);
+            this.loadedMap.set(command.data.name, { command, filePath });
+
+            // Collect parent + subcommand structure
+            const parent = command.data.name;
+            const subs = [];
+            if (command.data.options) {
+              command.data.options.forEach(opt => {
+                if (opt.type === 1) subs.push(opt.name);
+                if (opt.type === 2) {
+                  subs.push(`${opt.name}`);
+                  opt.options?.forEach(subOpt => { if (subOpt.type === 1) subs.push(`${opt.name}.${subOpt.name}`); });
+                }
+              });
+            }
+
+            const fileLabel = path.basename(filePath);
+            const jsonLike = `${fileLabel} { ${parent} [${subs.join(', ')}] }`;
+            loadedLogs.push({ name: fileLabel, line: jsonLike });
+          } else {
+            this.stats.skippedFiles++;
+            failedLogs.push({ name: path.basename(filePath), line: `⚠️ Skipped invalid command: ${path.basename(filePath)}` });
           }
-          this.loadedMap.set(command.data.name, { command, filePath });
-          const matchedKeys = [...enabledKeys].filter(k => this._parentFromKey(k) === command.data.name);
-          logLines.push(`Loaded parent: ${command.data.name} -> ${path.relative(this.root, filePath)} | subkeys: [${matchedKeys.join(', ')}]`);
         } catch (err) {
-          // Provide a succinct load error in the main log and preserve the stack in detailed error if needed
-          logLines.push(`{ERROR} LOAD ERROR: ${path.relative(this.root, filePath)} -> ${err.message}`);
+          this.stats.failedCommands++;
+          failedLogs.push({ name: path.basename(filePath), line: `❌ Failed: ${path.basename(filePath)} (${err.message})` });
         }
       }
+
+      await this._saveCloadData();
+
+      const sortByName = arr => arr.sort((a, b) => a.name.localeCompare(b.name));
+      sortByName(loadedLogs);
+      sortByName(failedLogs);
+      sortByName(skippedLogs);
 
       const header = [
         'Command Load Log',
@@ -155,18 +192,61 @@ class CommandLoader {
         ''
       ];
 
+      const logLines = [];
+      logLines.push('=== ✅ Loaded Commands (JSON Style) ===');
+      logLines.push(...loadedLogs.map(x => x.line));
+      logLines.push('');
+      logLines.push('=== ❌ Failed Commands ===');
+      logLines.push(...failedLogs.map(x => x.line));
+      logLines.push('');
+      logLines.push('=== ⚠️ Skipped Logic Files ===');
+      logLines.push(...skippedLogs.map(x => x.line));
+
       await fs.writeFile(logFilePath, header.concat(logLines).join('\n'), 'utf8');
       console.log(`[Clog] ✅ Commands logged to ${logFileName}`);
+
+      const statsPath = path.join(this.clogFolder, 'command-stats.json');
+      await fs.writeFile(statsPath, JSON.stringify({
+        timestamp: new Date().toISOString(),
+        stats: this.stats,
+        categories: Object.fromEntries(this.stats.categories)
+      }, null, 2));
+
       return Array.from(this.loadedMap.values());
     } catch (err) {
-      console.error(`{ERROR} ❌ Error loading commands: ${err.message}`);
+      console.error(`{ERROR} ❌ Error in command loading: ${err.message}`);
       return [];
+    }
+  }
+
+  _validateCommand(command, filePath) {
+    try {
+      if (!command || !command.data || typeof command.execute !== 'function') return false;
+      if (!command.data.name || typeof command.data.name !== 'string') return false;
+      if (command.data.options && Array.isArray(command.data.options)) {
+        command.data.options.forEach(opt => {
+          if (opt.type === 1) this.stats.subCommands++;
+          if (opt.type === 2) {
+            this.stats.subCommandGroups++;
+            if (opt.options && Array.isArray(opt.options)) {
+              opt.options.forEach(subOpt => { if (subOpt.type === 1) this.stats.subCommands++; });
+            }
+          }
+        });
+      }
+      return true;
+    } catch (err) {
+      console.error(`{ERROR} Command validation error for ${path.basename(filePath)}: ${err.message}`);
+      return false;
     }
   }
 
   getCommand(parentName) {
     return this.loadedMap.get(parentName)?.command;
   }
-}
 
+  getStats() {
+    return { ...this.stats, categories: Object.fromEntries(this.cloadData.categories) };
+  }
+}
 module.exports = { CommandLoader };
