@@ -1,252 +1,244 @@
 // ==========================================================================
-// CommandLoader.js — Expanded version (with explicit arrays, A–Z sorting, JSON-like log format)
+// CommandLoader.js — Loads commands, writes summary (CLOAD.json) + debug log
 // ==========================================================================
+'use strict';
 
-const fs = require('fs').promises;
-const fssync = require('fs');
+const fs = require('fs');
 const path = require('path');
-const CLOAD_PATH = path.join(__dirname, '..', 'config', 'CLOAD.json');
 
+// --------------------------------------------------------------------------
+// JSON helpers with atomic write
+// --------------------------------------------------------------------------
+function readJsonSafe(filePath, fallback) {
+  try {
+    if (!fs.existsSync(filePath)) return fallback;
+    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJsonAtomic(filePath, data) {
+  const tmp = `${filePath}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
+  fs.renameSync(tmp, filePath);
+}
+
+// --------------------------------------------------------------------------
+// Require cache clearing
+// --------------------------------------------------------------------------
+function clearRequireCache(modulePath) {
+  const resolved = require.resolve(modulePath);
+  const visited = new Set();
+  (function dfs(modId) {
+    if (!require.cache[modId] || visited.has(modId)) return;
+    visited.add(modId);
+    const mod = require.cache[modId];
+    for (const child of mod.children) dfs(child.id);
+    delete require.cache[modId];
+  })(resolved);
+}
+
+// --------------------------------------------------------------------------
+// Walk a directory recursively for .js files
+// --------------------------------------------------------------------------
+function walkDir(dir, exts = ['.js', '.cjs', '.mjs']) {
+  const out = [];
+  (function walk(d) {
+    if (!fs.existsSync(d)) return;
+    for (const ent of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, ent.name);
+      if (ent.isDirectory()) walk(full);
+      else if (exts.includes(path.extname(ent.name))) out.push(full);
+    }
+  })(dir);
+  return out;
+}
+
+// --------------------------------------------------------------------------
+// Extract parent/child relationships from SlashCommandBuilder
+// --------------------------------------------------------------------------
+function extractRelationships(commandExport) {
+  const parents = [];
+  const children = [];
+  const asArray = Array.isArray(commandExport) ? commandExport : [commandExport];
+  for (const cmd of asArray) {
+    if (!cmd) continue;
+    const name = cmd?.data?.name || cmd?.name;
+    if (!name) continue;
+    const options = cmd?.data?.options || [];
+    const subcommands = options.filter(o => o.type === 1); // subcommand
+    const groups = options.filter(o => o.type === 2); // group
+    if (subcommands.length > 0 || groups.length > 0) {
+      parents.push(name);
+      for (const s of subcommands) children.push({ parent: name, name: s.name });
+      for (const g of groups) {
+        if (Array.isArray(g.options)) {
+          for (const sc of g.options.filter(o => o.type === 1)) {
+            children.push({ parent: `${name} ${g.name}`, name: sc.name });
+          }
+        }
+      }
+    } else {
+      children.push({ parent: null, name });
+    }
+  }
+  return { parents: Array.from(new Set(parents)), children };
+}
+
+// --------------------------------------------------------------------------
+// Apply command toggles from commands.json
+// --------------------------------------------------------------------------
+function applyToggles(commands, toggles) {
+  if (!toggles || typeof toggles !== 'object') return commands;
+  return commands.filter(c => {
+    const key = c.data?.name || c.name;
+    return toggles[key]?.enabled !== false;
+  });
+}
+
+// --------------------------------------------------------------------------
+// CommandLoader
+// --------------------------------------------------------------------------
 class CommandLoader {
-  constructor(commandsRootPath, client = null) {
-    this.root = commandsRootPath || path.join(__dirname, '..', 'commands');
+  constructor(client, opts = {}) {
     this.client = client;
-    this.loadedMap = new Map();
-    this.clogFolder = path.join(__dirname, '..', 'Clog');
-    this.stats = {
-      fileCount: 0,
-      mainCommands: 0,
-      subCommands: 0,
-      subCommandGroups: 0,
-      totalCommands: 0,
-      failedCommands: 0,
-      skippedFiles: 0,
-      disabledCommands: 0,
-      categories: new Map()
+    this.baseDir = opts.baseDir || path.resolve(__dirname, '..');
+    this.paths = {
+      commandsDir: path.join(this.baseDir, 'commands'),
+      clogDir: path.join(this.baseDir, 'Clog'),
+      configDir: path.join(this.baseDir, 'config'),
+      cloadJson: path.join(this.baseDir, 'config', 'CLOAD.json'),
+      togglesJson: path.join(this.baseDir, 'config', 'commands.json'),
     };
-
-    this.cloadData = {
-      lastUpdate: '',
-      version: '1.0',
-      stats: this.stats,
-      loadedCommands: []
-    };
+    if (!fs.existsSync(this.paths.clogDir)) fs.mkdirSync(this.paths.clogDir, { recursive: true });
+    if (!fs.existsSync(this.paths.configDir)) fs.mkdirSync(this.paths.configDir, { recursive: true });
   }
 
-  async ensureClogFolder() {
-    if (!fssync.existsSync(this.clogFolder)) {
-      await fs.mkdir(this.clogFolder, { recursive: true });
-      console.log('[Clog] 📁 Created Clog folder');
-    }
-  }
+  async loadAll() {
+    const files = walkDir(this.paths.commandsDir);
+    const toggleMap = readJsonSafe(this.paths.togglesJson, {});
 
-  _commandsJsonPath() {
-    return path.join(__dirname, '..', 'config', 'commands.json');
-  }
+    const logs = [];
+    const perFile = {};
+    const tree = {};
+    const loadedCommands = [];
+    let disabledCount = 0;
+    let logicalCount = 0;
 
-  async _readCommandsJson() {
-    const p = this._commandsJsonPath();
-    if (!fssync.existsSync(p)) throw new Error(`{ERROR} commands.json not found at ${p}`);
-    const raw = await fs.readFile(p, 'utf8');
-    return JSON.parse(raw);
-  }
+    for (const absPath of files) {
+      const relPath = path.relative(this.baseDir, absPath).replace(/\\/g, '/');
+      const baseName = path.basename(relPath);
 
-  _requireFresh(filePath) {
-    try { delete require.cache[require.resolve(filePath)]; } catch {}
-    const mod = require(filePath);
-    return mod && mod.default ? mod.default : mod;
-  }
+      // logical files start with `--`
+      if (baseName.startsWith('--')) {
+        logicalCount++;
+        continue;
+      }
 
-  async _trackCommandStats(command, filePath) {
-    this.stats.mainCommands++;
-    const category = path.basename(path.dirname(filePath));
-    if (!this.stats.categories.has(category)) {
-      this.stats.categories.set(category, { count: 0, commands: [] });
-    }
-    this.stats.categories.get(category).count++;
-    this.stats.categories.get(category).commands.push(command.data.name);
-
-    if (command.data.options) {
-      command.data.options.forEach(opt => {
-        if (opt.type === 1) this.stats.subCommands++;
-        if (opt.type === 2) {
-          this.stats.subCommandGroups++;
-          opt.options?.forEach(subOpt => { if (subOpt.type === 1) this.stats.subCommands++; });
+      try {
+        clearRequireCache(absPath);
+        const mod = require(absPath);
+        const exported = mod?.default ?? mod;
+        const candidates = Array.isArray(exported) ? exported : [exported];
+        const commandsFromFile = [];
+        for (const c of candidates) {
+          if (!c) continue;
+          const name = c?.data?.name || c?.name;
+          if (name) commandsFromFile.push(c);
         }
-      });
+        const toggled = applyToggles(commandsFromFile, toggleMap);
+        disabledCount += (commandsFromFile.length - toggled.length);
+        if (toggled.length === 0) {
+          perFile[relPath] = [];
+          continue;
+        }
+        const rel = extractRelationships(toggled);
+        for (const p of rel.parents) tree[p] = tree[p] || [];
+        for (const { parent, name } of rel.children) {
+          if (parent) {
+            tree[parent] = tree[parent] || [];
+            if (!tree[parent].includes(name)) tree[parent].push(name);
+          }
+        }
+
+        for (const cmd of toggled) {
+          loadedCommands.push(cmd);
+        }
+
+        perFile[relPath] = toggled.map(c => c?.data?.name || c?.name).filter(Boolean);
+      } catch (err) {
+        logs.push(`[ERROR] ${relPath}: ${err.message}`);
+      }
     }
 
-    this.stats.totalCommands = this.stats.mainCommands + this.stats.subCommands;
-    this.stats.fileCount++;
-  }
-
-  async _saveCloadData() {
-    const data = {
-      ...this.cloadData,
-      lastUpdate: new Date().toISOString(),
-      stats: this.stats,
-      categories: Object.fromEntries(this.stats.categories),
-      loadedCommands: Array.from(this.loadedMap.keys())
-    };
-    await fs.writeFile(CLOAD_PATH, JSON.stringify(data, null, 2));
-  }
-
-  async loadCommands() {
-    await this.ensureClogFolder();
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[:.]/g, '-');
-    const logFileName = `load-log-${timestamp}.txt`;
-    const logFilePath = path.join(this.clogFolder, logFileName);
-
-    const loadedLogs = [];
-    const failedLogs = [];
-    const skippedLogs = [];
+    // build REST payload
+    const appCommands = loadedCommands
+      .map(c => (c?.data?.toJSON ? c.data.toJSON() : c?.data || c))
+      .filter(Boolean);
 
     try {
-      await this._readCommandsJson();
-
-      const rootEntries = await fs.readdir(this.root);
-      let allCommandFiles = [];
-
-      for (const entry of rootEntries) {
-        const fullPath = path.join(this.root, entry);
-        const stat = fssync.statSync(fullPath);
-
-        if (stat.isFile() && entry.endsWith('.js')) {
-          if (entry.startsWith('--')) {
-            skippedLogs.push({ name: entry, line: `{SKIP} Skipped file (logic): ${entry}` });
-            continue;
-          }
-          allCommandFiles.push(fullPath);
-        }
-
-        if (stat.isDirectory()) {
-          const subEntries = await fs.readdir(fullPath);
-          for (const subEntry of subEntries) {
-            const subFull = path.join(fullPath, subEntry);
-            const subStat = fssync.statSync(subFull);
-            if (subStat.isFile() && subEntry.endsWith('.js')) {
-              if (subEntry.startsWith('--')) {
-                skippedLogs.push({ name: subEntry, line: `{SKIP} Skipped file (logic): ${path.relative(this.root, subFull)}` });
-                continue;
-              }
-              allCommandFiles.push(subFull);
-            }
-          }
-        }
+      if (!this.client?.application) throw new Error('client.application not ready');
+      if (process.env.GUILD_ID) {
+        await this.client.application.commands.set(appCommands, process.env.GUILD_ID);
+      } else {
+        await this.client.application.commands.set(appCommands);
       }
-
-      this.stats.fileCount = allCommandFiles.length;
-      this.stats.mainCommands = 0;
-      this.stats.subCommands = 0;
-
-      for (const filePath of allCommandFiles) {
-        try {
-          const command = this._requireFresh(filePath);
-          if (this._validateCommand(command, filePath)) {
-            await this._trackCommandStats(command, filePath);
-            this.loadedMap.set(command.data.name, { command, filePath });
-
-            // Collect parent + subcommand structure
-            const parent = command.data.name;
-            const subs = [];
-            if (command.data.options) {
-              command.data.options.forEach(opt => {
-                if (opt.type === 1) subs.push(opt.name);
-                if (opt.type === 2) {
-                  subs.push(`${opt.name}`);
-                  opt.options?.forEach(subOpt => { if (subOpt.type === 1) subs.push(`${opt.name}.${subOpt.name}`); });
-                }
-              });
-            }
-
-            const fileLabel = path.basename(filePath);
-            const jsonLike = `${fileLabel} { ${parent} [${subs.join(', ')}] }`;
-            loadedLogs.push({ name: fileLabel, line: jsonLike });
-          } else {
-            this.stats.skippedFiles++;
-            failedLogs.push({ name: path.basename(filePath), line: `⚠️ Skipped invalid command: ${path.basename(filePath)}` });
-          }
-        } catch (err) {
-          this.stats.failedCommands++;
-          failedLogs.push({ name: path.basename(filePath), line: `❌ Failed: ${path.basename(filePath)} (${err.message})` });
-        }
-      }
-
-      await this._saveCloadData();
-
-      const sortByName = arr => arr.sort((a, b) => a.name.localeCompare(b.name));
-      sortByName(loadedLogs);
-      sortByName(failedLogs);
-      sortByName(skippedLogs);
-
-      const header = [
-        'Command Load Log',
-        '==================',
-        `Bot Name: ${this.client?.user?.username || 'Unknown'}`,
-        `Bot ID: ${this.client?.user?.id || 'Unknown'}`,
-        `Server Count: ${this.client?.guilds?.cache?.size ?? 0}`,
-        `Startup Time: ${now.toLocaleString()} (local)`,
-        `UTC Time: ${now.toUTCString()}`,
-        '==================',
-        ''
-      ];
-
-      const logLines = [];
-      logLines.push('=== ✅ Loaded Commands (JSON Style) ===');
-      logLines.push(...loadedLogs.map(x => x.line));
-      logLines.push('');
-      logLines.push('=== ❌ Failed Commands ===');
-      logLines.push(...failedLogs.map(x => x.line));
-      logLines.push('');
-      logLines.push('=== ⚠️ Skipped Logic Files ===');
-      logLines.push(...skippedLogs.map(x => x.line));
-
-      await fs.writeFile(logFilePath, header.concat(logLines).join('\n'), 'utf8');
-      console.log(`[Clog] ✅ Commands logged to ${logFileName}`);
-
-      const statsPath = path.join(this.clogFolder, 'command-stats.json');
-      await fs.writeFile(statsPath, JSON.stringify({
-        timestamp: new Date().toISOString(),
-        stats: this.stats,
-        categories: Object.fromEntries(this.stats.categories)
-      }, null, 2));
-
-      return Array.from(this.loadedMap.values());
     } catch (err) {
-      console.error(`{ERROR} ❌ Error in command loading: ${err.message}`);
-      return [];
+      logs.push(`[REGISTER-ERROR] ${err.message}`);
     }
-  }
 
-  _validateCommand(command, filePath) {
-    try {
-      if (!command || !command.data || typeof command.execute !== 'function') return false;
-      if (!command.data.name || typeof command.data.name !== 'string') return false;
-      if (command.data.options && Array.isArray(command.data.options)) {
-        command.data.options.forEach(opt => {
-          if (opt.type === 1) this.stats.subCommands++;
-          if (opt.type === 2) {
-            this.stats.subCommandGroups++;
-            if (opt.options && Array.isArray(opt.options)) {
-              opt.options.forEach(subOpt => { if (subOpt.type === 1) this.stats.subCommands++; });
-            }
-          }
-        });
-      }
-      return true;
-    } catch (err) {
-      console.error(`{ERROR} Command validation error for ${path.basename(filePath)}: ${err.message}`);
-      return false;
+    // build summary object
+    const summary = {
+      loaded: {
+        commandfile: Object.keys(perFile).length,
+        commands: loadedCommands.length,
+        childcommands: Object.values(tree).reduce((a, b) => a + b.length, 0),
+        commandgroups: new Set(files.map(f => path.dirname(f))).size - 1, // minus root
+        commanddisable: disabledCount,
+        commandstotal: loadedCommands.length + disabledCount,
+        logicfiles: logicalCount,
+      },
+    };
+
+    writeJsonAtomic(this.paths.cloadJson, summary);
+
+    // write human-readable debug log
+    const txtLines = [];
+    txtLines.push(`== Command Load Report ==`);
+    txtLines.push(`Updated: ${new Date().toISOString()}`);
+    txtLines.push('');
+    txtLines.push(`Totals: files=${summary.loaded.commandfile}, commands=${summary.loaded.commands}, parents=${Object.keys(tree).length}, children=${summary.loaded.childcommands}, logical=${logicalCount}, disabled=${disabledCount}`);
+    txtLines.push('');
+
+    txtLines.push('By File:');
+    for (const [file, list] of Object.entries(perFile).sort()) {
+      txtLines.push(`- ${file}`);
+      if (list.length === 0) txtLines.push('  (no enabled commands)');
+      for (const name of list) txtLines.push(`  • ${name}`);
     }
-  }
 
-  getCommand(parentName) {
-    return this.loadedMap.get(parentName)?.command;
-  }
+    txtLines.push('');
+    txtLines.push('Parent → Children:');
+    const parents = Object.keys(tree).sort();
+    if (parents.length === 0) txtLines.push('(none)');
+    for (const p of parents) {
+      const kids = tree[p];
+      if (kids.length === 0) continue;
+      txtLines.push(`- ${p}`);
+      for (const c of kids) txtLines.push(`  • ${c}`);
+    }
 
-  getStats() {
-    return { ...this.stats, categories: Object.fromEntries(this.cloadData.categories) };
+    if (logs.length) {
+      txtLines.push('');
+      txtLines.push('Errors/Warnings:');
+      for (const l of logs) txtLines.push(`- ${l}`);
+    }
+
+    const logFile = path.join(this.paths.clogDir, `command_load_${Date.now()}.txt`);
+    fs.writeFileSync(logFile, txtLines.join('\n'), 'utf8');
+
+    return { count: appCommands.length, logFile, cloadJson: this.paths.cloadJson };
   }
 }
 module.exports = { CommandLoader };

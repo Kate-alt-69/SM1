@@ -1,59 +1,127 @@
 {
-  "lastUpdate": "2025-09-03T14:21:18.864Z",
-  "version": "1.0",
-  "stats": {
-    "fileCount": 28,
-    "mainCommands": 13,
-    "subCommands": 0,
-    "subCommandGroups": 0,
-    "totalCommands": 13,
-    "failedCommands": 0,
-    "skippedFiles": 2,
-    "disabledCommands": 0,
-    "categories": {}
+  "lastUpdate": "2025-09-06T06:06:32.248Z",
+  "totals": {
+    "files": 18,
+    "commands": 13,
+    "parents": 0,
+    "children": 0
   },
-  "loadedCommands": [
-    "about",
-    "console",
-    "embed",
-    "emojitest",
-    "fun",
-    "help",
-    "kick",
-    "ping",
-    "create",
-    "role",
-    "sticky",
-    "utility"
-  ],
-  "categories": {
-    "commands": {
-      "count": 11,
-      "commands": [
-        "about",
-        "console",
-        "emojitest",
-        "fun",
-        "help",
-        "kick",
-        "ping",
-        "create",
-        "role",
-        "sticky",
-        "utility"
-      ]
+  "index": {
+    "about": {
+      "file": "commands/about.js",
+      "isParent": false,
+      "parentName": null
+    },
+    "console": {
+      "file": "commands/consol.js",
+      "isParent": false,
+      "parentName": null
+    },
+    "EmbedLogic": {
+      "file": "commands/embed/--embedLogic.js",
+      "isParent": false,
+      "parentName": null
     },
     "embed": {
-      "count": 1,
-      "commands": [
-        "embed"
-      ]
+      "file": "commands/embed/embed.js",
+      "isParent": false,
+      "parentName": null
+    },
+    "emojitest": {
+      "file": "commands/emojitest.js",
+      "isParent": false,
+      "parentName": null
+    },
+    "fun": {
+      "file": "commands/fun.js",
+      "isParent": false,
+      "parentName": null
+    },
+    "help": {
+      "file": "commands/help.js",
+      "isParent": false,
+      "parentName": null
+    },
+    "kick": {
+      "file": "commands/moderation.js",
+      "isParent": false,
+      "parentName": null
+    },
+    "ping": {
+      "file": "commands/ping.js",
+      "isParent": false,
+      "parentName": null
+    },
+    "create": {
+      "file": "commands/question.js",
+      "isParent": false,
+      "parentName": null
+    },
+    "role": {
+      "file": "commands/roles.js",
+      "isParent": false,
+      "parentName": null
     },
     "sticky": {
-      "count": 1,
-      "commands": [
-        "sticky"
-      ]
+      "file": "commands/sticky.js",
+      "isParent": false,
+      "parentName": null
+    },
+    "utility": {
+      "file": "commands/utility.js",
+      "isParent": false,
+      "parentName": null
     }
-  }
+  },
+  "files": {
+    "commands/about.js": [
+      "about"
+    ],
+    "commands/consol.js": [
+      "console"
+    ],
+    "commands/embed/--default-embed-Logic.js": [],
+    "commands/embed/--embedLogic.js": [
+      "EmbedLogic"
+    ],
+    "commands/embed/embed-commands/--command-manager.js": [
+      "embed"
+    ],
+    "commands/embed/embed.js": [
+      "embed"
+    ],
+    "commands/emojitest.js": [
+      "emojitest"
+    ],
+    "commands/fun.js": [
+      "fun"
+    ],
+    "commands/help.js": [
+      "help"
+    ],
+    "commands/index.js": [],
+    "commands/moderation.js": [
+      "kick"
+    ],
+    "commands/path-define.js": [],
+    "commands/ping.js": [
+      "ping"
+    ],
+    "commands/question.js": [
+      "create"
+    ],
+    "commands/roles.js": [
+      "role"
+    ],
+    "commands/sticky/sticky.js": [
+      "sticky"
+    ],
+    "commands/sticky.js": [
+      "sticky"
+    ],
+    "commands/utility.js": [
+      "utility"
+    ]
+  },
+  "tree": {}
 }

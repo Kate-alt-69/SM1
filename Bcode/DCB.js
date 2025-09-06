@@ -9,7 +9,11 @@ const { keepAlive } = require('./KA.js');
 const { EmojiCache } = require('./utils/EmojiCache');
 const { BotDataManager } = require('./utils/BotDataManager.js');
 const { DataSavingSystem } = require('./utils/DataSavingSystem');
-
+function clearTerminal() {
+    if (process.stdout.isTTY) {
+        process.stdout.write('\x1Bc'); // Full reset escape sequence
+    }
+}
 // Simple connection check before login
 const ConnectionManager = {
     checkInternet: async () => {
@@ -90,6 +94,8 @@ class Bot extends Client {
                         console.log('[SYSTEM] 🕒 Preparing to display status...');
                         await new Promise(resolve => setTimeout(resolve, 1000));
                         
+                        clearTerminal();
+                        // Show status panel
                         this.displayEnhancedStatus();
                         resolve();
                     } catch (error) {

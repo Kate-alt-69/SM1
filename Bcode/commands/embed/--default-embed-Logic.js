@@ -26,5 +26,4 @@ const defaultEmbeds = {
     components: [],
   },
 };
-
 module.exports = { defaultEmbeds };

@@ -93,7 +93,7 @@ class TokenEditorUtility {
       setInputEnabled(true);
     }
   }
-  async #askForToken({ promptID = 'token.edit', title = 'Edit Bot Token', description = 'Paste your bot token below. This will be saved temporarily.', defaultValue = '' } = {}) {
+  async #askForToken({ promptID = 'token.edit', title = 'Edit Bot Token', description = 'Paste your bot token below. This will be saved temporarily.', defaultValue = 'empty-token' } = {}) {
     return this.#withPromptLock(async () => {
       console.log('\n[INFO] Enter your bot token below (paste it fully and press Enter):\n');
 

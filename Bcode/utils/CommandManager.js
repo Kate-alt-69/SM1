@@ -37,10 +37,18 @@ class CommandManager {
                 return false;
             }
 
-            const loadedCommands = await this.loader.loadCommands();
+            let loadedCommands = await this.loader.loadCommands();
             if (!loadedCommands || !Array.isArray(loadedCommands)) {
                 console.error('{ERROR} Failed to load commands: Invalid response from loader');
                 return false;
+            }
+
+            // 🔧 Wrap plain commands into { command, filePath }
+            if (loadedCommands.length && !loadedCommands[0].command) {
+                loadedCommands = loadedCommands.map(c => ({
+                    command: c,
+                    filePath: c?.filePath || 'unknown'
+                }));
             }
 
             // Clear existing commands and stats
@@ -72,6 +80,12 @@ class CommandManager {
             }
 
             this.stats.totalCommands = this.stats.mainCommands + this.stats.subCommands;
+
+            console.log(`[SYSTEM] ✅ Loaded ${this.commands.size} commands into CommandManager`);
+            for (const key of this.commands.keys()) {
+                console.log(`   • ${key}`);
+            }
+
             return true;
 
         } catch (error) {

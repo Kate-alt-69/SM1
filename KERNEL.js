@@ -16,9 +16,17 @@ import CMDstop from './Utility_Module/CMDstop.js';
 import Settings from './Utility_Module/FUNCTsetting.js';
 import { bcodePath, commandsJsonPath } from './defined/path-define.js';
 import { handleInput, toggleInput } from './Utility_Module/KNinput.manager.js';
+import { setTimeout } from 'timers/promises';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+// ✅ Small helper to clear the terminal nicely
+function clearTerminal() {
+  if (process.stdout.isTTY) {
+    process.stdout.write('\x1Bc'); // Full reset
+    console.log('[KERNEL] Try # help for information')
+  }
+}
 
 // ✅ Verify Bcode structure
 await KNchecksum.checkBcodeStructure();
@@ -65,7 +73,7 @@ const clearPrompt = () => { promptVisible = false; };
 // ✅ Startup Token Check (delegated)
 await tokenEditor.ensureTokenOnStartup();
 showPrompt(true);
-
+clearTerminal();
 // ✅ Shutdown Logic
 const shutdownProcess = async () => {
   console.log('[STARTUP] ⛔️ Shutting down...');
@@ -115,7 +123,7 @@ process.stdin.on('data', async (data) => {
   const [main, sub, arg, arg2] = input.split(' ');
 
   if (main === '#') {
-    const mainCmds = ['token', 'toggle', 'start', 'stop', 'restart', 'help', 'setting'];
+    const mainCmds = ['token', 'toggle', 'start', 'stop', 'clear',  'restart', 'help', 'setting'];
     if (!mainCmds.includes(sub)) {
       return handleInvalidCommand('#', sub, mainCmds, '# <CMD>');
     }
@@ -146,6 +154,10 @@ process.stdin.on('data', async (data) => {
     else if (sub === 'stop') {
       await CMDstop({ stop: true });
       console.log('[STOP] 🛑 Bot stopped');
+    }
+    else if (sub === 'clear') {
+      await clearTerminal 
+      setTimeout(() => clearTerminal(), 1000)
     }
     else if (sub === 'restart') {
       console.log('[RESTART] 🚀 Restarting...');
