@@ -156,16 +156,15 @@ process.stdin.on('data', async (data) => {
       console.log('[STOP] 🛑 Bot stopped');
     }
     else if (sub === 'clear') {
-      await clearTerminal 
-      setTimeout(() => clearTerminal(), 1000)
+      clearTerminal();
     }
     else if (sub === 'restart') {
       console.log('[RESTART] 🚀 Restarting...');
       await CMDstop({ restart: true });
-      setTimeout(() => CMDstart(), 1000);
     }
     else if (sub === 'help') {
       const commands = [
+        { command: '# clear', info: 'clear the terminal'},
         { command: '# start', info: 'Start the bot' },
         { command: '# stop', info: 'Stop the bot' },
         { command: '# restart', info: 'Restart the bot' },
@@ -174,17 +173,16 @@ process.stdin.on('data', async (data) => {
         { command: '# setting help', info: 'Bot settings commands' },
         { command: 'how to shutdown', info: 'use the normal CTRL + C to shutdown whole process'}
       ];
-
-      console.log('\n┌─────────┬──────────────────────────┬─────────────────────────────────────────────────────────┐');
-      console.log('│ (index) │ Command                  │ Description                                             │');
-      console.log('├─────────┼──────────────────────────┼─────────────────────────────────────────────────────────┤');
+      console.log('\n┌───┬──────────────────────────┬─────────────────────────────────────────────────────────┐');
+      console.log('│   │ Command                  │ Description                                             │');
+      console.log('├───┼──────────────────────────┼─────────────────────────────────────────────────────────┤');
       commands.forEach((cmd, i) => {
-        const idx = String(i).padEnd(7);
+        const idx = String(i).padEnd(1);
         const c = cmd.command.padEnd(24);
         const d = cmd.info.padEnd(55);
         console.log(`│ ${idx} │ ${c} │ ${d} │`);
       });
-      console.log('└─────────┴──────────────────────────┴─────────────────────────────────────────────────────────┘\n');
+      console.log('└───┴──────────────────────────┴─────────────────────────────────────────────────────────┘\n');
     }
     else if (sub === 'setting') {
       if (!arg) {
@@ -207,24 +205,18 @@ process.stdin.on('data', async (data) => {
   else {
     console.log(`[INPUT] ❌ Invalid input: "${input}"\n[INPUT] 💡 Commands start with '#' or '@'`);
   }
-
   showPrompt(true);
 });
-
-
 process.on('SIGINT', async () => {
   console.log('\n[CTRL+C] 🔌 Interrupt signal received (SIGINT)');
   await shutdownProcess();
 });
-
 process.on('SIGTERM', async () => {
   console.log('\n[SIGNAL] 🔌 SIGTERM received');
   await shutdownProcess();
 });
-
 process.stdin.resume();
 showPrompt(true);
-
 //,,,,,,,,,,,,,,,,,
 //END OF KERNEL.js |
 //````````````

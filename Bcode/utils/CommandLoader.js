@@ -56,29 +56,35 @@ function walkDir(dir, exts = ['.js', '.cjs', '.mjs']) {
 }
 
 // --------------------------------------------------------------------------
-// Extract parent/child relationships from SlashCommandBuilder
+// Recursive extraction of parent/child relationships
 // --------------------------------------------------------------------------
 function extractRelationships(commandExport) {
   const parents = [];
   const children = [];
   const asArray = Array.isArray(commandExport) ? commandExport : [commandExport];
+
+  function recurse(base, opts) {
+    if (!Array.isArray(opts)) return;
+    for (const o of opts) {
+      if (o.type === 1) {
+        // subcommand
+        children.push({ parent: base, name: o.name });
+      } else if (o.type === 2) {
+        // group
+        recurse(`${base} ${o.name}`, o.options);
+      }
+    }
+  }
+
   for (const cmd of asArray) {
     if (!cmd) continue;
     const name = cmd?.data?.name || cmd?.name;
     if (!name) continue;
     const options = cmd?.data?.options || [];
-    const subcommands = options.filter(o => o.type === 1); // subcommand
-    const groups = options.filter(o => o.type === 2); // group
-    if (subcommands.length > 0 || groups.length > 0) {
+    recurse(name, options);
+
+    if (options.some(o => o.type === 1 || o.type === 2)) {
       parents.push(name);
-      for (const s of subcommands) children.push({ parent: name, name: s.name });
-      for (const g of groups) {
-        if (Array.isArray(g.options)) {
-          for (const sc of g.options.filter(o => o.type === 1)) {
-            children.push({ parent: `${name} ${g.name}`, name: sc.name });
-          }
-        }
-      }
     } else {
       children.push({ parent: null, name });
     }
@@ -119,18 +125,20 @@ class CommandLoader {
     const files = walkDir(this.paths.commandsDir);
     const toggleMap = readJsonSafe(this.paths.togglesJson, {});
 
-    const logs = [];
+    const failures = {};
     const perFile = {};
-    const tree = {};
     const loadedCommands = [];
+    const tree = {};
     let disabledCount = 0;
     let logicalCount = 0;
 
-    for (const absPath of files) {
-      const relPath = path.relative(this.baseDir, absPath).replace(/\\/g, '/');
-      const baseName = path.basename(relPath);
+    // track duplicates
+    const nameMap = new Map();
 
-      // logical files start with `--`
+    for (const absPath of files) {
+      const baseName = path.basename(absPath);
+
+      // logical files
       if (baseName.startsWith('--')) {
         logicalCount++;
         continue;
@@ -145,14 +153,32 @@ class CommandLoader {
         for (const c of candidates) {
           if (!c) continue;
           const name = c?.data?.name || c?.name;
-          if (name) commandsFromFile.push(c);
+          if (name) {
+            c.__file = baseName; // attach origin file
+            commandsFromFile.push(c);
+          }
         }
         const toggled = applyToggles(commandsFromFile, toggleMap);
         disabledCount += (commandsFromFile.length - toggled.length);
+
         if (toggled.length === 0) {
-          perFile[relPath] = [];
+          perFile[baseName] = [];
           continue;
         }
+
+        // detect duplicates
+        for (const c of toggled) {
+          const name = c?.data?.name || c?.name;
+          if (nameMap.has(name)) {
+            failures['[DUPLICATE-NAME]'] = failures['[DUPLICATE-NAME]'] || [];
+            failures['[DUPLICATE-NAME]'].push(
+              `${name} from ${nameMap.get(name)} and ${c.__file}`
+            );
+          } else {
+            nameMap.set(name, c.__file);
+          }
+        }
+
         const rel = extractRelationships(toggled);
         for (const p of rel.parents) tree[p] = tree[p] || [];
         for (const { parent, name } of rel.children) {
@@ -162,13 +188,15 @@ class CommandLoader {
           }
         }
 
-        for (const cmd of toggled) {
-          loadedCommands.push(cmd);
-        }
+        loadedCommands.push(...toggled);
 
-        perFile[relPath] = toggled.map(c => c?.data?.name || c?.name).filter(Boolean);
+        perFile[baseName] = rel.parents.length
+          ? rel.parents.map(p => ({ parent: p, children: tree[p] || [] }))
+          : toggled.map(c => ({ parent: c?.data?.name || c?.name, children: [] }));
       } catch (err) {
-        logs.push(`[ERROR] ${relPath}: ${err.message}`);
+        failures[baseName] = failures[baseName] || [];
+        failures[baseName].push(err.message);
+        perFile[baseName] = null; // mark as failed
       }
     }
 
@@ -185,58 +213,58 @@ class CommandLoader {
         await this.client.application.commands.set(appCommands);
       }
     } catch (err) {
-      logs.push(`[REGISTER-ERROR] ${err.message}`);
+      failures['[REGISTER-ERROR]'] = [err.message];
     }
 
-    // build summary object
+    // summary object
     const summary = {
       loaded: {
         commandfile: Object.keys(perFile).length,
         commands: loadedCommands.length,
         childcommands: Object.values(tree).reduce((a, b) => a + b.length, 0),
-        commandgroups: new Set(files.map(f => path.dirname(f))).size - 1, // minus root
+        commandgroups: new Set(files.map(f => path.dirname(f))).size - 1,
         commanddisable: disabledCount,
         commandstotal: loadedCommands.length + disabledCount,
         logicfiles: logicalCount,
       },
     };
-
     writeJsonAtomic(this.paths.cloadJson, summary);
 
-    // write human-readable debug log
-    const txtLines = [];
-    txtLines.push(`== Command Load Report ==`);
-    txtLines.push(`Updated: ${new Date().toISOString()}`);
-    txtLines.push('');
-    txtLines.push(`Totals: files=${summary.loaded.commandfile}, commands=${summary.loaded.commands}, parents=${Object.keys(tree).length}, children=${summary.loaded.childcommands}, logical=${logicalCount}, disabled=${disabledCount}`);
-    txtLines.push('');
+    // build text log
+    const lines = [];
+    lines.push('=============== CommandLoader ===============');
+    lines.push(`Updated: ${new Date().toISOString()} (UTC)`);
+    lines.push('');
+    lines.push(`Totals: files=${summary.loaded.commandfile}, commands=${summary.loaded.commands}, parents=${Object.keys(tree).length}, children=${summary.loaded.childcommands}, logical=${logicalCount}, disabled=${disabledCount}`);
+    lines.push('');
+    lines.push('Files:');
 
-    txtLines.push('By File:');
-    for (const [file, list] of Object.entries(perFile).sort()) {
-      txtLines.push(`- ${file}`);
-      if (list.length === 0) txtLines.push('  (no enabled commands)');
-      for (const name of list) txtLines.push(`  • ${name}`);
+    for (const [file, info] of Object.entries(perFile).sort()) {
+      if (info === null) {
+        lines.push(`❌ ${file} -> [FAILED]`);
+      } else if (info.length === 0) {
+        lines.push(`✔️ ${file} -> (no enabled commands)`);
+      } else {
+        for (const entry of info) {
+          const children = entry.children.length ? `(${entry.children.join(', ')})` : '()';
+          lines.push(`✔️ ${file} -> [${entry.parent} => ${children}]`);
+        }
+      }
     }
 
-    txtLines.push('');
-    txtLines.push('Parent → Children:');
-    const parents = Object.keys(tree).sort();
-    if (parents.length === 0) txtLines.push('(none)');
-    for (const p of parents) {
-      const kids = tree[p];
-      if (kids.length === 0) continue;
-      txtLines.push(`- ${p}`);
-      for (const c of kids) txtLines.push(`  • ${c}`);
+    if (Object.keys(failures).length) {
+      lines.push('');
+      lines.push('Failures:');
+      for (const [file, errs] of Object.entries(failures)) {
+        lines.push(`- ${file}:`);
+        for (const e of errs) lines.push(`   ❌ ${e}`);
+      }
     }
 
-    if (logs.length) {
-      txtLines.push('');
-      txtLines.push('Errors/Warnings:');
-      for (const l of logs) txtLines.push(`- ${l}`);
-    }
+    lines.push('============================================');
 
     const logFile = path.join(this.paths.clogDir, `command_load_${Date.now()}.txt`);
-    fs.writeFileSync(logFile, txtLines.join('\n'), 'utf8');
+    fs.writeFileSync(logFile, lines.join('\n'), 'utf8');
 
     return { count: appCommands.length, logFile, cloadJson: this.paths.cloadJson };
   }

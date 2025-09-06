@@ -155,7 +155,6 @@ module.exports = {
             client.stickyLastSent = new Map();
         }
     },
-
     async saveData(client) {
         const data = {
             messages: Object.fromEntries(client.stickyMessages),
