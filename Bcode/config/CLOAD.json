@@ -2,8 +2,8 @@
   "loaded": {
     "commandfile": 14,
     "commands": 12,
-    "childcommands": 0,
-    "commandgroups": 3,
+    "childcommands": 16,
+    "commandgroups": 4,
     "commanddisable": 0,
     "commandstotal": 12,
     "logicfiles": 4

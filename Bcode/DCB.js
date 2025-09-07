@@ -122,19 +122,16 @@ class Bot extends Client {
             console.log('[SYSTEM] ✅ Core services initialized');
 
             // Phase 2: Data Systems
-            console.log('[SYSTEM] 📦 Initializing data systems...');
             await this.dataSavingSystem.ready();
             await new Promise(resolve => setTimeout(resolve, 2000));
             console.log('[SYSTEM] ✅ Data systems ready');
 
             // Phase 3: Load Resources
-            console.log('[SYSTEM] 🔄 Loading resources...');
             await this.emojiCache.loadEmojis();
             await new Promise(resolve => setTimeout(resolve, 2000));
             console.log('[SYSTEM] ✅ Resources loaded');
 
             // Phase 4: Commands
-            console.log('[SYSTEM] 📝 Loading commands...');
             const commandsLoaded = await this.commandManager.loadCommands();
             if (!commandsLoaded) {
                 throw new Error('Failed to load commands');
@@ -167,27 +164,43 @@ class Bot extends Client {
     }
 
     displayEnhancedStatus() {
-        const tokenInfo = this.tokenManager.getTokenInfo();
-        const stats = this.commandManager.stats;
-        
-        console.log('\n===========================================');
-        console.log('              BOT STATUS                   ');
-        console.log('===========================================');
-        console.log(`📊 Servers         : ${this.guilds.cache.size}`);
-        console.log(`🤖 Bot Info        : ${this.user.tag} (ID: ${this.user.id})`);
-        console.log(`🔑 Token Source    : ${tokenInfo.source}`);
-        console.log('📁 Command Stats');
-        console.log(`   • Files         : ${stats.fileCount}`);
-        console.log(`   • Main Commands : ${stats.mainCommands}`);
-        console.log(`   • Subcommands   : ${stats.subCommands}`);
-        console.log(`   • Groups        : ${stats.subCommandGroups}`);
-        console.log(`   • Total         : ${stats.totalCommands}`);
-        console.log('💾 Systems Status');
-        console.log(`   • DSS           : ${this.dataSavingSystem?.initialized ? '✅' : '❌'}`);
-        console.log(`   • BDM           : ${this.botDataManager?.initialized ? '✅' : '⚪'}`);
-        console.log('===========================================');
-        console.log('Type "# stop" to stop from hosting\n');
+    const tokenInfo = this.tokenManager.getTokenInfo();
+    const stats = this.commandManager.stats;
+
+    // Load CLOAD.json
+    const cloadPath = path.join(__dirname, 'config', 'CLOAD.json');
+    let cloadData = {};
+    try {
+      cloadData = JSON.parse(fs.readFileSync(cloadPath, 'utf8'));
+    } catch {
+      cloadData = { loaded: {} };
     }
+    console.log('\n===========================================');
+    console.log('              BOT STATUS                   ');
+    console.log('===========================================');
+    console.log(`📊 Servers         : ${this.guilds.cache.size}`);
+    console.log(`🤖 Bot Info        : ${this.user.tag} (ID: ${this.user.id})`);
+    console.log(`🔑 Token Source    : ${tokenInfo.source}`);
+    console.log('📁 Command Stats');
+    console.log(`   • Files         : ${stats.fileCount}`);
+    console.log(`   • Main Commands : ${stats.mainCommands}`);
+    console.log(`   • Subcommands   : ${stats.subCommands}`);
+    console.log(`   • Groups        : ${stats.subCommandGroups}`);
+    console.log(`   • Total         : ${stats.totalCommands}`);
+    console.log('📦 CommandLoader Summary');
+    console.log(`   • Files         : ${cloadData.loaded?.commandfile ?? 'N/A'}`);
+    console.log(`   • Commands      : ${cloadData.loaded?.commands ?? 'N/A'}`);
+    console.log(`   • Subcommands   : ${cloadData.loaded?.childcommands ?? 'N/A'}`);
+    console.log(`   • Groups        : ${cloadData.loaded?.commandgroups ?? 'N/A'}`);
+    console.log(`   • Disabled      : ${cloadData.loaded?.commanddisable ?? 'N/A'}`);
+    console.log(`   • Total         : ${cloadData.loaded?.commandstotal ?? 'N/A'}`);
+    console.log(`   • Logic Files   : ${cloadData.loaded?.logicfiles ?? 'N/A'}`);
+    console.log('💾 Systems Status');
+    console.log(`   • DSS           : ${this.dataSavingSystem?.initialized ? '✅' : '❌'}`);
+    console.log(`   • BDM           : ${this.botDataManager?.initialized ? '✅' : '⚪'}`);
+    console.log('===========================================');
+    console.log('Type "# stop" to stop from hosting\n');
+}
     startConnectionMonitoring() {
         // Check connection every 30 seconds
         this.connectionCheckInterval = setInterval(async () => {

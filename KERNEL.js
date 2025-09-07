@@ -123,7 +123,7 @@ process.stdin.on('data', async (data) => {
   const [main, sub, arg, arg2] = input.split(' ');
 
   if (main === '#') {
-    const mainCmds = ['token', 'toggle', 'start', 'stop', 'clear',  'restart', 'help', 'setting'];
+    const mainCmds = ['token', 'toggle', 'start', 'stop', 'clear', 'version', 'restart', 'help', 'setting'];
     if (!mainCmds.includes(sub)) {
       return handleInvalidCommand('#', sub, mainCmds, '# <CMD>');
     }
@@ -132,8 +132,7 @@ process.stdin.on('data', async (data) => {
       toggleInput(false); // Disable input while token editor runs
       await tokenEditor.handleCommand(arg, arg2);
       toggleInput(true);
-    }
-    else if (sub === 'toggle') {
+    } else if (sub === 'toggle') {
       const ToggleManager = (await import('./Utility_Module/FUNCTtoggle.js')).default;
       if (!arg) {
         console.log('\n[TOGGLE] 💡 Use "# toggle help" for available subcommands.');
@@ -147,23 +146,21 @@ process.stdin.on('data', async (data) => {
       else if (arg === 'snapshot') ToggleManager.takeSnapshot();
       else if (arg === 'rollback' && arg2) ToggleManager.rollbackSnapshot(arg2);
       else ToggleManager.toggleHelp();
-    }
-    else if (sub === 'start') {
+    } else if (sub === 'start') {
       await CMDstart();
-    }
-    else if (sub === 'stop') {
+    } else if (sub === 'stop') {
       await CMDstop({ stop: true });
       console.log('[STOP] 🛑 Bot stopped');
-    }
-    else if (sub === 'clear') {
+    } else if (sub === 'clear') {
       clearTerminal();
-    }
-    else if (sub === 'restart') {
+    } else if (sub === 'version') {
+      console.log('Version 1.2.0')
+    } else if (sub === 'restart') {
       console.log('[RESTART] 🚀 Restarting...');
       await CMDstop({ restart: true });
-    }
-    else if (sub === 'help') {
+    } else if (sub === 'help') {
       const commands = [
+        { command: '# version', infor: 'Check SM1 Version'},
         { command: '# clear', info: 'clear the terminal'},
         { command: '# start', info: 'Start the bot' },
         { command: '# stop', info: 'Stop the bot' },
@@ -183,8 +180,7 @@ process.stdin.on('data', async (data) => {
         console.log(`│ ${idx} │ ${c} │ ${d} │`);
       });
       console.log('└───┴──────────────────────────┴─────────────────────────────────────────────────────────┘\n');
-    }
-    else if (sub === 'setting') {
+    } else if (sub === 'setting') {
       if (!arg) {
         console.log('\n[SETTING] 💡 Use "# setting help" for available subcommands.');
         return;
@@ -197,8 +193,7 @@ process.stdin.on('data', async (data) => {
       else if (arg === 'help') Settings.helpCmd();
       else console.log('[SETTING] list | about | runerror | cleanup | relaunch | help');
     }
-  }
-  else if (main === '@') {
+  } else if (main === '@') {
     if (sub === 'restart') await shutdownProcess();
     else handleInvalidCommand('@', sub, ['restart'], '@ restart');
   }

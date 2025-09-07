@@ -78,9 +78,10 @@ function extractRelationships(commandExport) {
 
   for (const cmd of asArray) {
     if (!cmd) continue;
-    const name = cmd?.data?.name || cmd?.name;
+    const json = cmd?.data?.toJSON ? cmd.data.toJSON() : cmd?.data || {};
+    const name = json.name || cmd?.name;
     if (!name) continue;
-    const options = cmd?.data?.options || [];
+    const options = json.options || [];
     recurse(name, options);
 
     if (options.some(o => o.type === 1 || o.type === 2)) {
@@ -136,6 +137,7 @@ class CommandLoader {
     const nameMap = new Map();
 
     for (const absPath of files) {
+      const relPath = path.relative(this.paths.commandsDir, absPath);
       const baseName = path.basename(absPath);
 
       // logical files
@@ -152,9 +154,10 @@ class CommandLoader {
         const commandsFromFile = [];
         for (const c of candidates) {
           if (!c) continue;
-          const name = c?.data?.name || c?.name;
+          const json = c?.data?.toJSON ? c.data.toJSON() : c?.data || {};
+          const name = json.name || c?.name;
           if (name) {
-            c.__file = baseName; // attach origin file
+            c.__file = relPath; // attach origin file (relative!)
             commandsFromFile.push(c);
           }
         }
@@ -162,13 +165,14 @@ class CommandLoader {
         disabledCount += (commandsFromFile.length - toggled.length);
 
         if (toggled.length === 0) {
-          perFile[baseName] = [];
+          perFile[relPath] = [];
           continue;
         }
 
         // detect duplicates
         for (const c of toggled) {
-          const name = c?.data?.name || c?.name;
+          const json = c?.data?.toJSON ? c.data.toJSON() : c?.data || {};
+          const name = json.name || c?.name;
           if (nameMap.has(name)) {
             failures['[DUPLICATE-NAME]'] = failures['[DUPLICATE-NAME]'] || [];
             failures['[DUPLICATE-NAME]'].push(
@@ -190,13 +194,16 @@ class CommandLoader {
 
         loadedCommands.push(...toggled);
 
-        perFile[baseName] = rel.parents.length
+        perFile[relPath] = rel.parents.length
           ? rel.parents.map(p => ({ parent: p, children: tree[p] || [] }))
-          : toggled.map(c => ({ parent: c?.data?.name || c?.name, children: [] }));
+          : toggled.map(c => {
+              const json = c?.data?.toJSON ? c.data.toJSON() : c?.data || {};
+              return { parent: json.name || c?.name, children: [] };
+            });
       } catch (err) {
-        failures[baseName] = failures[baseName] || [];
-        failures[baseName].push(err.message);
-        perFile[baseName] = null; // mark as failed
+        failures[relPath] = failures[relPath] || [];
+        failures[relPath].push(err.message);
+        perFile[relPath] = null; // mark as failed
       }
     }
 
@@ -222,7 +229,9 @@ class CommandLoader {
         commandfile: Object.keys(perFile).length,
         commands: loadedCommands.length,
         childcommands: Object.values(tree).reduce((a, b) => a + b.length, 0),
-        commandgroups: new Set(files.map(f => path.dirname(f))).size - 1,
+        commandgroups: new Set(
+          files.map(f => path.relative(this.paths.commandsDir, path.dirname(f)))
+        ).size,
         commanddisable: disabledCount,
         commandstotal: loadedCommands.length + disabledCount,
         logicfiles: logicalCount,
