@@ -1,0 +1,10 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Run SM1
+Comment=Launch Node.js with kernel-launch
+Exec=bash -c 'cd "$(dirname "%k")" && ./run.sh'
+Icon=utilities-terminal
+Terminal=false
+Categories=Utility;
