@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Discord bot for server management",
   "main": "DCB.js",
+  "type": "commonjs",
   "scripts": {
     "start": "node DCB.js",
     "sDEV": "node DCB.js --dev",

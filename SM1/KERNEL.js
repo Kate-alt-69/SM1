@@ -160,7 +160,7 @@ process.stdin.on('data', async (data) => {
       await CMDstop({ restart: true });
     } else if (sub === 'help') {
       const commands = [
-        { command: '# version', infor: 'Check SM1 Version'},
+        { command: '# version', info: 'Check SM1 Version'},
         { command: '# clear', info: 'clear the terminal'},
         { command: '# start', info: 'Start the bot' },
         { command: '# stop', info: 'Stop the bot' },

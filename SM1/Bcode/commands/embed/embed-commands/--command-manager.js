@@ -1,5 +1,5 @@
 // ============================================================================
-// --command-manager.js — Embed Manager Command (with DSS integration)
+// --command-manager.js — Embed Manager Command (with DSS + DSSIO integration)
 // ============================================================================
 const {
   SlashCommandBuilder,
@@ -12,18 +12,65 @@ const {
   TextInputBuilder,
   TextInputStyle,
 } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 const { DataSavingSystem: DSS } = require('../../../utils/DataSavingSystem.js');
+const { DSSIO } = require('../../../utils/DSS-I-O.js');
 const { defaultEmbeds } = require('../--default-embed-Logic.js');
 
-// Add active editors tracking
+// Track active editor sessions in memory
 const activeEditors = new Map();
+const EMBED_SESSION_FILE = path.join(__dirname, '..', 'embed.json');
 
-// Add validation helper
+// ========================= FILE HELPERS =========================
+function readSessionFile() {
+  if (!fs.existsSync(EMBED_SESSION_FILE)) {
+    return { activeEditors: {}, metadata: { lastCleanup: Date.now() } };
+  }
+  return JSON.parse(fs.readFileSync(EMBED_SESSION_FILE, 'utf8'));
+}
+
+function writeSessionFile(data) {
+  fs.writeFileSync(EMBED_SESSION_FILE, JSON.stringify(data, null, 2), 'utf8');
+}
+
+function saveEditorSession(messageId, session) {
+  const data = readSessionFile();
+  data.activeEditors[messageId] = session;
+  writeSessionFile(data);
+}
+
+function getEditorSession(messageId) {
+  const data = readSessionFile();
+  const session = data.activeEditors[messageId];
+  if (!session) return null;
+
+  // Expiration check
+  if (Date.now() > session.expiresAt) {
+    delete data.activeEditors[messageId];
+    writeSessionFile(data);
+    return null;
+  }
+  return session;
+}
+
+function updateEditorSession(messageId, changes) {
+  const data = readSessionFile();
+  if (!data.activeEditors[messageId]) return null;
+  data.activeEditors[messageId] = {
+    ...data.activeEditors[messageId],
+    ...changes,
+  };
+  writeSessionFile(data);
+  return data.activeEditors[messageId];
+}
+
+// ========================= SESSION HELPERS =========================
 function isValidEditor(messageId) {
   if (!activeEditors.has(messageId)) return false;
   const editor = activeEditors.get(messageId);
-  
-  // Check if expired (6 hours = 21600000ms)
+
+  // Expired after 6h
   if (Date.now() - editor.startTime > 21600000) {
     activeEditors.delete(messageId);
     return false;
@@ -31,8 +78,8 @@ function isValidEditor(messageId) {
   return true;
 }
 
-// Packet helper matches DSS interface requirements
-function createDSSPacket(interaction, embedData, type = 'create') {
+// Build DSS packet
+function createDSSPacket(interaction, embedData, name, type = 'save') {
   return {
     folder: 'embeds',
     userID: interaction.user.id,
@@ -40,20 +87,28 @@ function createDSSPacket(interaction, embedData, type = 'create') {
     time: Date.now(),
     from: 'embed_manager',
     type: type,
-    dataID: null,  // For DSS to allocate
+    dataID: null, // DSS allocates
     data: {
-      name: embedData.title,
+      name: name || embedData.title,
       author: {
         name: interaction.user.tag,
-        id: interaction.user.id
+        id: interaction.user.id,
       },
-      embed: embedData
+      embed: embedData,
     },
     markerdata: {
       isEmbed: true,
-      version: '1.0'
-    }
+      version: '1.0',
+    },
   };
+}
+
+// Save helper
+async function saveEmbedToDSS(interaction, embedData, name) {
+  await DSS.ready();
+  const packet = createDSSPacket(interaction, embedData, name, 'save');
+  const blob = await DSS.createBlob(packet);
+  return blob;
 }
 
 // ========================= MAIN COMMAND =========================
@@ -70,12 +125,13 @@ async function execute(interaction) {
           { label: 'List Embeds', value: 'list_embeds' },
           { label: 'Send Embed', value: 'send_embed' },
         ]);
+
       const row = new ActionRowBuilder().addComponents(dropdown);
-      
-      const reply = await interaction.reply({ 
-        embeds: [managerEmbed], 
+
+      const reply = await interaction.reply({
+        embeds: [managerEmbed],
         components: [row],
-        fetchReply: true 
+        fetchReply: true,
       });
 
       // Save editor session
@@ -83,20 +139,20 @@ async function execute(interaction) {
         userId: interaction.user.id,
         channelId: interaction.channelId,
         startTime: Date.now(),
-        state: 'menu'
+        state: 'menu',
       });
 
-      const filter = i => i.user.id === interaction.user.id;
-      const collector = reply.createMessageComponentCollector({ 
-        filter, 
-        time: 21600000 // 6 hours
+      const filter = (i) => i.user.id === interaction.user.id;
+      const collector = reply.createMessageComponentCollector({
+        filter,
+        time: 21600000, // 6h
       });
 
-      collector.on('collect', async i => {
+      collector.on('collect', async (i) => {
         try {
           if (i.customId === 'embed_options') {
             const selected = i.values[0];
-            
+
             if (selected === 'create_new') {
               const createEmbed = defaultEmbeds.creating.embed;
               const row = new ActionRowBuilder().addComponents(
@@ -108,13 +164,14 @@ async function execute(interaction) {
             }
 
             if (selected === 'list_embeds') {
-              const meta = await DSS.loadMetadata();
-              const embeds = Object.keys(meta.blobs)
-                .map(id => ({ id, ...meta.blobs[id] }))
-                .filter(b => !b.deleted);
+              const allEmbeds = DSSIO.API.list('embeds');
+              const serverEmbeds = allEmbeds.filter((e) => {
+                const blob = DSSIO.API.request('embeds', { blobId: e.blobId });
+                return blob && blob.serverID === interaction.guild.id;
+              });
 
-              const embedList = embeds.length
-                ? embeds.map(b => `• **${b.id}** (${b.path})`).join('\n')
+              const embedList = serverEmbeds.length
+                ? serverEmbeds.map((e) => `• **${e.name || e.blobId}** (ID: ${e.blobId})`).join('\n')
                 : '⚠️ No saved embeds found.';
 
               const listEmbed = new EmbedBuilder()
@@ -126,8 +183,13 @@ async function execute(interaction) {
             }
 
             if (selected === 'send_embed') {
-              const embeds = await DSS.loadMetadata();
-              if (!embeds?.blobs) {
+              const allEmbeds = DSSIO.API.list('embeds');
+              const serverEmbeds = allEmbeds.filter((e) => {
+                const blob = DSSIO.API.request('embeds', { blobId: e.blobId });
+                return blob && blob.serverID === interaction.guild.id;
+              });
+
+              if (!serverEmbeds.length) {
                 await i.update({ content: '⚠️ No embeds available to send.', ephemeral: true });
                 return;
               }
@@ -136,12 +198,30 @@ async function execute(interaction) {
                 .setCustomId('choose_embed_to_send')
                 .setPlaceholder('Select an embed to send...')
                 .addOptions(
-                  Object.keys(embeds.blobs).map(id => ({ label: id, value: id }))
+                  serverEmbeds.map((e) => ({
+                    label: e.name || `Embed ${e.blobId}`,
+                    value: e.blobId,
+                  }))
                 );
 
               const row = new ActionRowBuilder().addComponents(dropdown);
               await i.update({ content: '📤 Choose an embed to send:', components: [row], ephemeral: true });
             }
+          }
+
+          if (i.customId === 'choose_embed_to_send') {
+            const blobId = i.values[0];
+            const blob = DSSIO.API.load('embeds', blobId);
+
+            if (!blob?.data?.embed) {
+              await i.reply({ content: '⚠️ Could not load embed.', ephemeral: true });
+              return;
+            }
+
+            const embed = new EmbedBuilder(blob.data.embed);
+            await i.channel.send({ embeds: [embed] });
+
+            await i.reply({ content: `✅ Sent embed **${blob.data.name || blobId}**`, ephemeral: true });
           }
         } catch (error) {
           console.error('Collector Error:', error);
@@ -149,7 +229,7 @@ async function execute(interaction) {
         }
       });
 
-      collector.on('end', collected => {
+      collector.on('end', (collected) => {
         activeEditors.delete(reply.id);
         if (collected.size === 0) {
           interaction.editReply({
@@ -161,44 +241,27 @@ async function execute(interaction) {
     } catch (err) {
       console.error('Embed Manager Error:', err);
       if (!interaction.replied) {
-        await interaction.reply({ 
+        await interaction.reply({
           content: '⚠️ Failed to initialize embed manager.',
-          ephemeral: true 
+          ephemeral: true,
         });
       }
     }
   }
 }
 
-let currentEmbedData = null; // Temporary storage for embed being edited
-
+// ========================= EDITOR =========================
 async function startEmbedEditor(interaction) {
-  currentEmbedData = {
-    title: '',
-    description: '',
-    color: '#0099ff',
-    fields: [],
-    timestamp: new Date().toISOString()
-  };
-
   const modal = new ModalBuilder()
     .setCustomId('embed_editor_modal')
     .setTitle('Create Embed')
     .addComponents(
       new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('embed_title')
-          .setLabel('Embed Title')
-          .setStyle(TextInputStyle.Short)
-          .setRequired(true)
+        new TextInputBuilder().setCustomId('embed_title').setLabel('Embed Title').setStyle(TextInputStyle.Short).setRequired(true),
       ),
       new ActionRowBuilder().addComponents(
-        new TextInputBuilder()
-          .setCustomId('embed_description')
-          .setLabel('Embed Description')
-          .setStyle(TextInputStyle.Paragraph)
-          .setRequired(true)
-      )
+        new TextInputBuilder().setCustomId('embed_description').setLabel('Embed Description').setStyle(TextInputStyle.Paragraph).setRequired(true),
+      ),
     );
 
   await interaction.showModal(modal);
@@ -207,10 +270,7 @@ async function startEmbedEditor(interaction) {
 // ========================= BUTTON HANDLER =========================
 async function handleButton(interaction) {
   if (interaction.customId === 'edit_embed') {
-    const editEmbed = new EmbedBuilder()
-      .setTitle('✏️ Edit Embed')
-      .setDescription('Choose what you want to edit.')
-      .setColor('Orange');
+    const editEmbed = new EmbedBuilder().setTitle('✏️ Edit Embed').setDescription('Choose what you want to edit.').setColor('Orange');
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('edit_title').setLabel('Edit Title').setStyle(ButtonStyle.Secondary),
       new ButtonBuilder().setCustomId('edit_description').setLabel('Edit Description').setStyle(ButtonStyle.Secondary),
@@ -221,10 +281,7 @@ async function handleButton(interaction) {
   }
 
   if (interaction.customId === 'edit_fields') {
-    const fieldUI = new EmbedBuilder()
-      .setTitle('🧩 Manage Fields')
-      .setDescription('Add, delete, or edit up to 6 fields.')
-      .setColor('Purple');
+    const fieldUI = new EmbedBuilder().setTitle('🧩 Manage Fields').setDescription('Add, delete, or edit up to 6 fields.').setColor('Purple');
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder().setCustomId('add_field').setLabel('Add Field').setStyle(ButtonStyle.Success),
       new ButtonBuilder().setCustomId('delete_field').setLabel('Delete Field').setStyle(ButtonStyle.Danger),
@@ -240,12 +297,8 @@ async function handleButton(interaction) {
       .setTitle('Save Embed')
       .addComponents(
         new ActionRowBuilder().addComponents(
-          new TextInputBuilder()
-            .setCustomId('embed_name')
-            .setLabel('Enter a name for this embed')
-            .setStyle(TextInputStyle.Short)
-            .setRequired(true)
-        )
+          new TextInputBuilder().setCustomId('embed_name').setLabel('Enter a name for this embed').setStyle(TextInputStyle.Short).setRequired(true),
+        ),
       );
     return interaction.showModal(modal);
   }
@@ -257,99 +310,76 @@ async function handleButton(interaction) {
   }
 
   if (interaction.customId === 'edit_saved_embed') {
-    // Add edit functionality here if needed
-    return interaction.reply({ 
-      content: 'Edit functionality coming soon!', 
-      ephemeral: true 
-    });
+    return interaction.reply({ content: 'Edit functionality coming soon!', ephemeral: true });
   }
 }
 
 // ========================= MODAL HANDLER =========================
 async function handleModal(interaction) {
   if (interaction.customId === 'embed_editor_modal') {
-    await DSS.ready();
-    
     const embedData = {
       title: interaction.fields.getTextInputValue('embed_title'),
       description: interaction.fields.getTextInputValue('embed_description'),
       color: '#0099ff',
       timestamp: new Date().toISOString(),
-      fields: []
+      fields: [],
     };
 
-    const embed = new EmbedBuilder()
-      .setTitle(embedData.title)
-      .setDescription(embedData.description)
-      .setColor(embedData.color)
-      .setTimestamp();
+    const embed = new EmbedBuilder().setTitle(embedData.title).setDescription(embedData.description).setColor(embedData.color).setTimestamp();
 
-    // Create proper DSS packet
-    const packet = createDSSPacket(interaction, embedData);
-    const blob = await DSS.createBlob(packet);
-
-    // Update active editor data
+    // Store in session
     if (interaction.message?.id) {
-      activeEditors.set(interaction.message.id, {
-        ...activeEditors.get(interaction.message.id),
-        blobID: blob.blobID,
-        state: 'editing'
-      });
+      const session = activeEditors.get(interaction.message.id) || {};
+      activeEditors.set(interaction.message.id, { ...session, data: embedData, state: 'editing' });
     }
 
     const row = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('edit_saved_embed')
-        .setLabel('Edit')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId('send_saved_embed')
-        .setLabel('Send')
-        .setStyle(ButtonStyle.Success)
+      new ButtonBuilder().setCustomId('edit_saved_embed').setLabel('Edit').setStyle(ButtonStyle.Primary),
+      new ButtonBuilder().setCustomId('save_embed').setLabel('Save').setStyle(ButtonStyle.Success),
     );
 
-    return interaction.reply({ 
-      content: `✅ Embed saved with ID: **${blob.blobID}**`,
+    return interaction.reply({
+      content: `✏️ Embed ready. Use **Save** when done.`,
       embeds: [embed],
       components: [row],
-      ephemeral: true 
+      ephemeral: true,
     });
   }
 
   if (interaction.customId === 'save_embed_modal') {
-    await DSS.ready();
     const name = interaction.fields.getTextInputValue('embed_name');
-    const embedData = interaction.message.embeds[0]?.toJSON();
-    
-    // Create proper DSS packet for saving
-    const packet = createDSSPacket(interaction, {
-      ...embedData,
-      title: name
-    }, 'save');
-    
-    await DSS.createBlob(packet);
-    return interaction.reply({ content: `✅ Embed saved as **${name}**!`, ephemeral: true });
+    const session = interaction.message?.id ? activeEditors.get(interaction.message.id) : null;
+
+    if (!session?.data) {
+      return interaction.reply({ content: '⚠️ No embed data found to save. Please edit first.', ephemeral: true });
+    }
+
+    try {
+      const blob = await saveEmbedToDSS(interaction, session.data, name);
+
+      activeEditors.set(interaction.message.id, { ...session, blobID: blob.blobID });
+
+      return interaction.reply({
+        content: `✅ Embed saved as **${name}** in folder **embeds** with ID: **${blob.blobID}**`,
+        ephemeral: true,
+      });
+    } catch (err) {
+      console.error('DSS Save Error:', err);
+      return interaction.reply({ content: '⚠️ Failed to save embed to DSS.', ephemeral: true });
+    }
   }
 }
 
 // ========================= UNIFIED HANDLER =========================
 async function handleInteraction(interaction) {
   try {
-    // Check if this is a valid editor interaction
     const messageId = interaction.message?.id;
     if (messageId && !isValidEditor(messageId)) {
-      return interaction.reply({ 
-        content: '⚠️ This embed editor has expired. Please start a new session.',
-        ephemeral: true 
-      });
+      return interaction.reply({ content: '⚠️ This embed editor has expired. Please start a new session.', ephemeral: true });
     }
 
     if (interaction.isChatInputCommand()) {
-      if (interaction.commandName === 'embed') {
-        return execute(interaction);
-      }
-    } else if (interaction.isStringSelectMenu()) {
-      return;
+      if (interaction.commandName === 'embed') return execute(interaction);
     } else if (interaction.isButton()) {
       return handleButton(interaction);
     } else if (interaction.isModalSubmit()) {
@@ -368,10 +398,12 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('embed')
     .setDescription('Embed Manager')
-    .addSubcommand(sub => sub.setName('manager').setDescription('Open Embed Manager')),
+    .addSubcommand((sub) =>
+      sub.setName('manager').setDescription('Open Embed Manager')
+    ),
   execute,
   handleButton,
   handleModal,
   handleInteraction,
-  startEmbedEditor
+  startEmbedEditor,
 };

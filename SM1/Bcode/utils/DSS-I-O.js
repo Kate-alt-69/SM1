@@ -6,8 +6,6 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-
-const __dirname = path.resolve();
 const DATA_ROOT = path.join(__dirname, 'Bcode', 'data');
 const ALGORITHM = 'aes-256-gcm';
 const KEY = crypto.createHash('sha256').update('super_secret_key').digest();
@@ -52,6 +50,67 @@ function defaultMetadata() {
 
 // --------------------------- DSS-I-O Class ---------------------------------
 class DSSIO {
+   // Save blob (with optional human-readable name in metadata)
+  static saveBlob(folder, blobId, data, name = null) {
+    const folderPath = path.join(DATA_ROOT, folder);
+    ensureDir(folderPath);
+
+    const blobPath = path.join(folderPath, `${blobId}.json`);
+    const encrypted = encrypt(data);
+    fs.writeFileSync(blobPath, encrypted, 'utf-8');
+
+    const metadata = this.readMetadata(folder);
+    metadata.blobs[blobId] = {
+      path: blobPath,
+      deleted: false,
+      name: name || null,
+      createdAt: Date.now()
+    };
+    this.writeMetadata(folder, metadata);
+  }
+
+  // Lightweight listing (metadata only, no decryption)
+  static listBlobs(folder) {
+    const metadata = this.readMetadata(folder);
+    return Object.entries(metadata.blobs)
+      .filter(([_, entry]) => !entry.deleted)
+      .map(([blobId, entry]) => ({
+        blobId,
+        name: entry.name || null,
+        createdAt: entry.createdAt || null
+      }));
+  }
+
+  // Find blob by saved name
+  static findByName(folder, name) {
+    const metadata = this.readMetadata(folder);
+    const match = Object.entries(metadata.blobs)
+      .find(([_, entry]) => entry.name === name && !entry.deleted);
+    return match ? match[0] : null; // return blobId
+  }
+
+  // Unified request handler (fast reads)
+  static request(folder, opts = {}) {
+    if (opts.metaOnly) {
+      // metadata-only read
+      if (opts.blobId) {
+        const meta = this.readMetadata(folder);
+        return meta.blobs[opts.blobId] || null;
+      }
+      if (opts.name) {
+        const id = this.findByName(folder, opts.name);
+        return id ? this.readMetadata(folder).blobs[id] : null;
+      }
+    } else {
+      // full decrypted read
+      if (opts.blobId) return this.loadBlob(folder, opts.blobId);
+      if (opts.name) {
+        const id = this.findByName(folder, opts.name);
+        return id ? this.loadBlob(folder, id) : null;
+      }
+    }
+    return null;
+  }
   // Initialize folder + metadata
   static init(folder) {
     const folderPath = path.join(DATA_ROOT, folder);
@@ -124,12 +183,14 @@ class DSSIO {
 
 // --------------------------- Public API ------------------------------------
 const DSSIO_API = {
-  save: (folder, blobId, data) => DSSIO.saveBlob(folder, blobId, data),
+  save: (folder, blobId, data, name) => DSSIO.saveBlob(folder, blobId, data, name),
   load: (folder, blobId) => DSSIO.loadBlob(folder, blobId),
   delete: (folder, blobId) => DSSIO.deleteBlob(folder, blobId),
-  metadata: (folder) => DSSIO.readMetadata(folder)
+  metadata: (folder) => DSSIO.readMetadata(folder),
+  list: (folder) => DSSIO.listBlobs(folder),
+  findByName: (folder, name) => DSSIO.findByName(folder, name),
+  request: (folder, opts) => DSSIO.request(folder, opts)
 };
-
 // --------------------------- Auto-Initialize --------------------------------
 ensureDir(DATA_ROOT);
 console.log('[DSS-I-O] 💾 I/O Engine ready ✅');
@@ -139,7 +200,6 @@ module.exports = {
   DSSIO,
   API: DSSIO_API
 };
-
 // ============================================================================
 // Usage Example:
 // DSSIO.API.save('embeds', '0x00001', { title: 'Hello' });

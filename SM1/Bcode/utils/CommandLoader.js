@@ -120,6 +120,10 @@ class CommandLoader {
     };
     if (!fs.existsSync(this.paths.clogDir)) fs.mkdirSync(this.paths.clogDir, { recursive: true });
     if (!fs.existsSync(this.paths.configDir)) fs.mkdirSync(this.paths.configDir, { recursive: true });
+
+    // new: caches
+    this._loadedCommands = [];
+    this._summary = {};
   }
 
   async loadAll() {
@@ -275,7 +279,28 @@ class CommandLoader {
     const logFile = path.join(this.paths.clogDir, `command_load_${Date.now()}.txt`);
     fs.writeFileSync(logFile, lines.join('\n'), 'utf8');
 
-    return { count: appCommands.length, logFile, cloadJson: this.paths.cloadJson };
+    // cache results for later use
+    this._loadedCommands = loadedCommands;
+    this._summary = summary;
+
+    return {
+      commands: loadedCommands,     
+      summary,                      
+      count: appCommands.length,
+      logFile,
+      cloadJson: this.paths.cloadJson
+  };
+  }
+  // ------------------------------------------------------------------------
+  // Expose data for CommandManager and DCB.js
+  // ------------------------------------------------------------------------
+  getCommands() {
+    return this._loadedCommands || [];
+  }
+
+  getSummary() {
+    return this._summary || {};
   }
 }
+
 module.exports = { CommandLoader };
