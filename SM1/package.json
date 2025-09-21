@@ -11,7 +11,10 @@
   "dependencies": {
     "xterm": "^5.3.0",
     "ps-tree": "^1.2.0",
-    "acorn": "^8.11.3"
+    "acorn": "^8.11.3",
+    "bcrypt": "^5.1.1",
+    "bcryptjs": "^2.4.3",
+    "crypto-js": "^4.2.0"
   },
   "author": "K8",
   "license": "MIT"

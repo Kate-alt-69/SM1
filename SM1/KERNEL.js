@@ -9,22 +9,34 @@ import fs from 'fs';
 import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
-import { KNchecksum } from './Utility_Module/KNchecksum.js';
 import moduleCHK from './Bcode/utils/moduleCHK.js';
+import { bcodePath } from './defined/path-define.js';
+
+// ✅ Setup dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// ✅ Step 1: Ensure node_modules are installed
+await moduleCHK.checkAndInstallModules(bcodePath);
+
+// ✅ Step 2: Run authentication (blocks until login succeeds)
+//import { initAuth } from './Utility_Module/auth0.js';
+//await initAuth();
+
+// ✅ Step 3: Continue startup
+import { KNchecksum } from './Utility_Module/KNchecksum.js';
 import CMDstart from './Utility_Module/CMDstart.js';
 import CMDstop from './Utility_Module/CMDstop.js';
 import Settings from './Utility_Module/FUNCTsetting.js';
-import { bcodePath, commandsJsonPath } from './defined/path-define.js';
+import { commandsJsonPath } from './defined/path-define.js';
 import { handleInput, toggleInput } from './Utility_Module/KNinput.manager.js';
 import { setTimeout } from 'timers/promises';
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 // ✅ Small helper to clear the terminal nicely
 function clearTerminal() {
   if (process.stdout.isTTY) {
     process.stdout.write('\x1Bc'); // Full reset
-    console.log('[KERNEL] Try # help for information')
+    console.log('[KERNEL] Try # help for information');
   }
 }
 
@@ -32,7 +44,7 @@ function clearTerminal() {
 await KNchecksum.checkBcodeStructure();
 console.log('[CHECK] ✔️ Bcode structure verified successfully!');
 
-// ✅ Install root dependencies
+// ✅ Install root dependencies (safety check for root, separate from moduleCHK)
 try {
   execSync('npm install', { cwd: __dirname, stdio: 'inherit' });
   console.log('[STARTUP] ✔️ Root dependencies installed');
@@ -47,7 +59,10 @@ console.log('[STARTUP] 📝 Bcode Startup Complete');
 // ✅ PID File Initialization
 const pidPath = path.resolve('./Utility_Module/PID.json');
 if (!fs.existsSync(pidPath)) {
-  fs.writeFileSync(pidPath, JSON.stringify({ START: 'DISCORDSERVERMANAGER', PID: null, botrunning: false }, null, 2));
+  fs.writeFileSync(
+    pidPath,
+    JSON.stringify({ START: 'DISCORDSERVERMANAGER', PID: null, botrunning: false }, null, 2)
+  );
 }
 
 // ✅ Ensure commands.json exists
@@ -68,12 +83,15 @@ const showPrompt = (force = false) => {
     promptVisible = true;
   }
 };
-const clearPrompt = () => { promptVisible = false; };
+const clearPrompt = () => {
+  promptVisible = false;
+};
 
 // ✅ Startup Token Check (delegated)
 await tokenEditor.ensureTokenOnStartup();
 showPrompt(true);
 clearTerminal();
+
 // ✅ Shutdown Logic
 const shutdownProcess = async () => {
   console.log('[STARTUP] ⛔️ Shutting down...');
@@ -154,21 +172,21 @@ process.stdin.on('data', async (data) => {
     } else if (sub === 'clear') {
       clearTerminal();
     } else if (sub === 'version') {
-      console.log('Version 1.2.0')
+      console.log('Version 1.2.0');
     } else if (sub === 'restart') {
       console.log('[RESTART] 🚀 Restarting...');
       await CMDstop({ restart: true });
     } else if (sub === 'help') {
       const commands = [
-        { command: '# version', info: 'Check SM1 Version'},
-        { command: '# clear', info: 'clear the terminal'},
+        { command: '# version', info: 'Check SM1 Version' },
+        { command: '# clear', info: 'clear the terminal' },
         { command: '# start', info: 'Start the bot' },
         { command: '# stop', info: 'Stop the bot' },
         { command: '# restart', info: 'Restart the bot' },
         { command: '# token help', info: 'Token management commands' },
         { command: '# toggle help', info: 'Command toggling commands' },
         { command: '# setting help', info: 'Bot settings commands' },
-        { command: 'how to shutdown', info: 'use the normal CTRL + C to shutdown whole process'}
+        { command: 'how to shutdown', info: 'use the normal CTRL + C to shutdown whole process' }
       ];
       console.log('\n┌───┬──────────────────────────┬─────────────────────────────────────────────────────────┐');
       console.log('│   │ Command                  │ Description                                             │');
@@ -196,22 +214,25 @@ process.stdin.on('data', async (data) => {
   } else if (main === '@') {
     if (sub === 'restart') await shutdownProcess();
     else handleInvalidCommand('@', sub, ['restart'], '@ restart');
-  }
-  else {
+  } else {
     console.log(`[INPUT] ❌ Invalid input: "${input}"\n[INPUT] 💡 Commands start with '#' or '@'`);
   }
   showPrompt(true);
 });
+
 process.on('SIGINT', async () => {
   console.log('\n[CTRL+C] 🔌 Interrupt signal received (SIGINT)');
   await shutdownProcess();
 });
+
 process.on('SIGTERM', async () => {
   console.log('\n[SIGNAL] 🔌 SIGTERM received');
   await shutdownProcess();
 });
+
 process.stdin.resume();
 showPrompt(true);
+
 //,,,,,,,,,,,,,,,,,
 //END OF KERNEL.js |
-//````````````
+//```````````````

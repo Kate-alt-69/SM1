@@ -5,12 +5,8 @@
   "main": "kernel-launch",
   "type": "module",
   "scripts": {
-    "start": "cd SM1 && node kernel-launch"
-  },
-  "dependencies": {
-    "xterm": "^5.3.0",
-    "ps-tree": "^1.2.0",
-    "acorn": "^8.11.3"
+    "start": "cd SM1 && node kernel-launch",
+    "install" : "cd SM1 && npm install"
   },
   "author": "K8",
   "license": "MIT"
