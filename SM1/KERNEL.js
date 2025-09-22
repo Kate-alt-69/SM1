@@ -19,17 +19,21 @@ const __dirname = path.dirname(__filename);
 // ✅ Step 1: Ensure node_modules are installed
 await moduleCHK.checkAndInstallModules(bcodePath);
 
-// ✅ Step 2: Run authentication (blocks until login succeeds)
-//import { initAuth } from './Utility_Module/auth0.js';
-//await initAuth();
-
+// ✅ Step 2: AUTHENTICATION
+import { handleInput, toggleInput, initInputListener } from './Utility_Module/KNinput.manager.js';
+import {AuthManager} from "./Utility_Module/auth0.js"
+toggleInput(false); // Disable CLI while login is pending
+const auth = new AuthManager();
+const loginData = await auth.initAuth(); // Blocks until login succeeds
+console.log(`[AUTH] ✅ Logged in as: ${loginData.username}`);
+initInputListener(); // Start listener only after login
+toggleInput(true);   // Enable CLI now
 // ✅ Step 3: Continue startup
 import { KNchecksum } from './Utility_Module/KNchecksum.js';
 import CMDstart from './Utility_Module/CMDstart.js';
 import CMDstop from './Utility_Module/CMDstop.js';
 import Settings from './Utility_Module/FUNCTsetting.js';
 import { commandsJsonPath } from './defined/path-define.js';
-import { handleInput, toggleInput } from './Utility_Module/KNinput.manager.js';
 import { setTimeout } from 'timers/promises';
 
 // ✅ Small helper to clear the terminal nicely
@@ -93,7 +97,7 @@ showPrompt(true);
 clearTerminal();
 
 // ✅ Shutdown Logic
-const shutdownProcess = async () => {
+const restartprocess = async () => {
   console.log('[STARTUP] ⛔️ Shutting down...');
   await CMDstop({ shutdown: true });
   console.log('[STARTUP] ✔️ Shutdown complete');
@@ -208,11 +212,17 @@ process.stdin.on('data', async (data) => {
       else if (arg === 'runerror') await Settings.runErrorCheck(console.log);
       else if (arg === 'cleanup') console.log(await Settings.cleanUpSettings());
       else if (arg === 'relaunch') await Settings.relaunchBot(__filename);
+       // ---- New Auth-related commands ----
+      else if (arg === 'passwordreset') await auth.passwordReset();
+      else if (arg === 'lock') await auth.lockTerminal();
+      else if (arg === 'accountreset') await auth.accountReset();
+      else if (arg === 'accountdetail') auth.accountDetail();
       else if (arg === 'help') Settings.helpCmd();
       else console.log('[SETTING] list | about | runerror | cleanup | relaunch | help');
     }
   } else if (main === '@') {
-    if (sub === 'restart') await shutdownProcess();
+    if (sub === 'restart') await restartprocess();
+    else if (arg === 'shutdown') await shutdownkernel;
     else handleInvalidCommand('@', sub, ['restart'], '@ restart');
   } else {
     console.log(`[INPUT] ❌ Invalid input: "${input}"\n[INPUT] 💡 Commands start with '#' or '@'`);
@@ -222,17 +232,16 @@ process.stdin.on('data', async (data) => {
 
 process.on('SIGINT', async () => {
   console.log('\n[CTRL+C] 🔌 Interrupt signal received (SIGINT)');
-  await shutdownProcess();
+  await restartprocess();
 });
 
 process.on('SIGTERM', async () => {
   console.log('\n[SIGNAL] 🔌 SIGTERM received');
-  await shutdownProcess();
+  await restartprocess();
 });
 
 process.stdin.resume();
 showPrompt(true);
-
 //,,,,,,,,,,,,,,,,,
 //END OF KERNEL.js |
 //```````````````

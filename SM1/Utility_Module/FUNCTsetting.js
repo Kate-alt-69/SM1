@@ -309,19 +309,21 @@ class SettingsManager {
   }
 
   static helpCmd() {
-    console.log('\n┌─────────┬───────────────────────────┬──────────────────────────────────────────┐');
-    console.log('│ (index) │ Command                   │ Description                              │');
-    console.log('├─────────┼───────────────────────────┼──────────────────────────────────────────┤');
-    console.log('│ 0       │ # setting list            │ Show all settings and their status       │');
-    console.log('│ 1       │ # setting about           │ Display bot metadata and configuration   │');
-    console.log('│ 2       │ # setting runerror        │ Run syntax and config validation checks  │');
-    console.log('│ 3       │ # setting cleanup         │ Reset tokens and clean settings          │');
-    console.log('│ 4       │ # setting relaunch        │ Restart the bot process safely           │');
-    console.log('│ 5       │ # setting help            │ Show this help menu                      │');
-    console.log('└─────────┴───────────────────────────┴──────────────────────────────────────────┘\n');
+    console.log('\n┌─────────┬───────────────────────────┬────────────────────────────────────────────────────────────────┐');
+    console.log('│ (index) │ Command                   │ Description                                                    │');
+    console.log('├─────────┼───────────────────────────┼──────────────────────────────────────────────────────────────────┤');
+    console.log('│ 0       │ # setting list            │ Show all settings and their status                               │');
+    console.log('│ 1       │ # setting about           │ Display bot metadata and configuration                           │');
+    console.log('│ 2       │ # setting runerror        │ Run syntax and config validation checks                          │');
+    console.log('│ 3       │ # setting cleanup         │ Reset tokens and clean settings                                  │');
+    console.log('│ 4       │ # setting relaunch        │ Restart the bot process safely                                   │');
+    console.log('│ 5       │ # setting help            │ Show this help menu                                              │');
+    console.log('│ 5       │ # setting accountdetail   │ Show Account details                                             │');
+    console.log('│ 5       │ # setting accountreset    │ Reset Account and erase account data                             │');
+    console.log('│ 5       │ # setting lock            │ Locks Terminal Not View-able to any without Admin Password       │');
+    console.log('└─────────┴───────────────────────────┴──────────────────────────────────────────────────────────────────┘\n');
   }
 }
-
 export default SettingsManager;
 
 /* ------------------------------------------------------------------

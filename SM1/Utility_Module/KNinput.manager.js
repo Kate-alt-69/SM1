@@ -101,7 +101,10 @@ export function handleInput(data) {
 // Initial state check
 refreshInputState(true);
 // stdin listener
-if (process.stdin && process.stdin.on) {
+let listenerInitialized = false;
+export function initInputListener() {
+    if (listenerInitialized) return;
+    listenerInitialized = true;
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', (chunk) => handleInput(chunk));
 }
