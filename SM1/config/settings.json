@@ -1,3 +1,5 @@
 {
-    "input.from": "inmanage"
+  "input.from": "inprompt",
+  "alaRAM": "5000",
+  "alaCPU": "100"
 }

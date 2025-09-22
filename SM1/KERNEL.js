@@ -79,7 +79,7 @@ if (!fs.existsSync(commandsJsonPath)) {
 // ✅ Load Token Editor
 const { default: TokenEditorUtility } = await import('./Utility_Module/FUNCTtokenEditorUtility.js');
 const tokenEditor = new TokenEditorUtility(() => toggleInput(true)); // Re-enable input after prompt
-
+let signalSent = false;
 let promptVisible = false;
 const showPrompt = (force = false) => {
   if (!promptVisible || force) {
@@ -96,14 +96,22 @@ await tokenEditor.ensureTokenOnStartup();
 showPrompt(true);
 clearTerminal();
 
-// ✅ Shutdown Logic
+// ✅ Restart Logic
 const restartprocess = async () => {
   console.log('[STARTUP] ⛔️ Shutting down...');
-  await CMDstop({ shutdown: true });
+  if (process.send) process.send("restart");
   console.log('[STARTUP] ✔️ Shutdown complete');
+};
+const shutdownkernel = async () => {
+  console.log('[SHUTDOWN] ⛔️ Shutting down SM1...');
+  // optional cleanup routines here
+  try {
+    await Settings.cleanUpSettings();
+  } catch {}
+  // Notify launcher
+  if (process.send) process.send('shutdown');
   process.exit(0);
 };
-
 // ✅ Command Suggestion
 const suggestClosestCommand = (input, list) =>
   list.reduce((a, b) => {
@@ -212,30 +220,35 @@ process.stdin.on('data', async (data) => {
       else if (arg === 'runerror') await Settings.runErrorCheck(console.log);
       else if (arg === 'cleanup') console.log(await Settings.cleanUpSettings());
       else if (arg === 'relaunch') await Settings.relaunchBot(__filename);
-       // ---- New Auth-related commands ----
+       // ---- New = commands ---- //
       else if (arg === 'passwordreset') await auth.passwordReset();
       else if (arg === 'lock') await auth.lockTerminal();
       else if (arg === 'accountreset') await auth.accountReset();
       else if (arg === 'accountdetail') auth.accountDetail();
+      else if (arg === 'setram') Settings.setRamLimit(arg2);
+      else if (arg === 'setcpu') Settings.setCpuLimit(arg2);
       else if (arg === 'help') Settings.helpCmd();
       else console.log('[SETTING] list | about | runerror | cleanup | relaunch | help');
     }
   } else if (main === '@') {
     if (sub === 'restart') await restartprocess();
-    else if (arg === 'shutdown') await shutdownkernel;
+    else if (arg === 'shutdown') await shutdownkernel();
     else handleInvalidCommand('@', sub, ['restart'], '@ restart');
   } else {
     console.log(`[INPUT] ❌ Invalid input: "${input}"\n[INPUT] 💡 Commands start with '#' or '@'`);
   }
   showPrompt(true);
 });
-
 process.on('SIGINT', async () => {
-  console.log('\n[CTRL+C] 🔌 Interrupt signal received (SIGINT)');
+  if (signalSent) return;
+  signalSent = true;
+  console.log('\n[CTRL+C] 🔌 Interrupt signal received');
   await restartprocess();
 });
 
 process.on('SIGTERM', async () => {
+  if (signalSent) return;
+  signalSent = true;
   console.log('\n[SIGNAL] 🔌 SIGTERM received');
   await restartprocess();
 });

@@ -15,7 +15,6 @@ import fs from 'fs';
 import path from 'path';
 import { exec, spawn } from 'child_process';
 import Prompt from './Prompt.js';
-
 import {
   bcodePath,
   configPath,
@@ -26,10 +25,11 @@ import {
   cmdSnapshotPath,
   logsPath
 } from '../defined/path-define.js';
-
 import { KNchecksum } from './KNchecksum.js';
 import CommandToggleManager from './FUNCTtoggle.js';
-
+import { fileURLToPath } from 'url';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 class SettingsManager {
   static checkMissingFiles() {
     const required = ['ErrorCodes.js', 'CommandExecutor.js', 'Prompt.js'];
@@ -307,7 +307,24 @@ class SettingsManager {
       callback(`[RELAUNCH ERROR] ❌ ${err.message}`);
     }
   }
+  // Add inside SettingsManager class
+  static setRamLimit(valueMb) {
+    const settingsPath = path.resolve(__dirname, '../config/settings.json');
+    let settings = {};
+    if (fs.existsSync(settingsPath)) settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    settings.alaRAM = valueMb;
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    console.log(`[SETTINGS] 💾 RAM limit set to ${valueMb} MB`);
+  }
 
+  static setCpuLimit(valuePercent) {
+    const settingsPath = path.resolve(__dirname, '../config/settings.json');
+    let settings = {};
+    if (fs.existsSync(settingsPath)) settings = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
+    settings.alaCPU = valuePercent;
+    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    console.log(`[SETTINGS] 💾 CPU limit set to ${valuePercent}%`);
+  }
   static helpCmd() {
     console.log('\n┌─────────┬───────────────────────────┬────────────────────────────────────────────────────────────────┐');
     console.log('│ (index) │ Command                   │ Description                                                    │');
@@ -325,36 +342,27 @@ class SettingsManager {
   }
 }
 export default SettingsManager;
-
 /* ------------------------------------------------------------------
    Thin wrappers to preserve previous named-function exports and
    keep backward compatibility. They simply call the class methods.
    ------------------------------------------------------------------ */
-
 export function checkMissingFiles() {
   return SettingsManager.checkMissingFiles();
-}
-
-export async function listSettings() {
+} export async function listSettings() {
   return SettingsManager.listSettings();
-}
-
-export async function getBotAboutInfo() {
+} export async function getBotAboutInfo() {
   return SettingsManager.getBotAboutInfo();
-}
-
-export async function runErrorCheck(callback = console.log) {
+} export async function runErrorCheck(callback = console.log) {
   return SettingsManager.runErrorCheck(callback);
-}
-
-export async function cleanUpSettings() {
+} export async function cleanUpSettings() {
   return SettingsManager.cleanUpSettings();
-}
-
-export async function relaunchBot(kernelPath, callback = console.log) {
+} export async function relaunchBot(kernelPath, callback = console.log) {
   return SettingsManager.relaunchBot(kernelPath, callback);
+} export function setRamLimit(valueMb) {
+  return SettingsManager.setRamLimit(valueMb);
+} export function setCpuLimit(valuePercent) {
+  return SettingsManager.setCpuLimit(valuePercent);
 }
-
 //,,,,,,,,,,,,,,,,,,,,,,,,,,,,|
 // END FUNCTsetting.js         |
 //````````````````````````````|
