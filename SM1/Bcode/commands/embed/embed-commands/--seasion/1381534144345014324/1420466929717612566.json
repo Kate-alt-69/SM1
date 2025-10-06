@@ -1,0 +1,27 @@
+{
+  "id": "1420466929717612566",
+  "userId": "1150805639774355577",
+  "channelId": "1381534144944803893",
+  "serverId": "1381534144345014324",
+  "startTime": 1758736110705,
+  "lastActive": 1758736110705,
+  "state": "menu",
+  "data": {
+    "embed": {
+      "title": "New Embed",
+      "description": "Start editing this embed using the buttons below",
+      "color": "#0099ff",
+      "fields": [],
+      "footer": null,
+      "timestamp": "2025-09-24T17:48:30.705Z",
+      "author": null,
+      "thumbnail": null,
+      "image": null
+    },
+    "history": [],
+    "lastEdit": null
+  },
+  "pages": [
+    "menu"
+  ]
+}

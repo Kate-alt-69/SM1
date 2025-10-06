@@ -5,16 +5,17 @@ import readline from 'node:readline/promises';
 import { stdin as input, stdout as output } from 'node:process';
 import inputManager from './KNinput.manager.js'; // Compatibility
 
-const settingsPath = path.resolve('./config/settings.json');
+const settingsPath = path.resolve('../config/settings.json');
 
 function updateInputSource(source) {
   try {
-    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
-    settings['input.from'] = source;
-    fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-    console.log(`[SETTINGS] Updated input.from → ${source}`);
+    if (fs.existsSync(settingsPath)) {
+      const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+      settings['input.from'] = source;
+      fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+    }
   } catch (err) {
-    console.error('[ERROR] Failed to update settings.json:', err);
+    // Silently handle error to prevent breaking the auth flow
   }
 }
 
@@ -25,7 +26,7 @@ class Prompt {
    *   promptID?: string,
    *   title?: string,
    *   description?: string,
-   *   type?: 'string' | 'number' | 'boolean' | 'truerfalse' | 'select',
+   *   type?: 'string' | 'number' | 'boolean' | 'truerfalse' | 'select' | 'masked',
    *   defaultValue?: string | boolean | number | null,
    *   choices?: string[],
    *   onReceive?: (input: any) => void | Promise<void>
@@ -51,7 +52,9 @@ class Prompt {
 
     let result;
 
-    if (type === 'truerfalse') {
+    if (type === 'masked') {
+      result = await this.askMasked();
+    } else if (type === 'truerfalse') {
       result = await this.askTrueRFalse(defaultValue);
     } else if (type === 'select' && choices.length > 0) {
       result = await this.askSelect(choices, defaultValue);
@@ -139,6 +142,76 @@ class Prompt {
       process.stdin.resume();
       process.stdin.on('data', onKey);
       render();
+    });
+  }
+
+  static async askMasked() {
+    return new Promise((resolve) => {
+      let input = '';
+      let shiftPressed = false;
+      let lastLineLength = 2; // accounts for "> "
+      
+      process.stdin.setRawMode(true);
+      process.stdin.resume();
+      process.stdout.write('> ');
+
+      const renderLine = () => {
+        // Clear current line
+        process.stdout.write('\r' + ' '.repeat(lastLineLength) + '\r');
+        // Write prompt and masked/unmasked input
+        process.stdout.write('> ' + (shiftPressed ? input : '#'.repeat(input.length)));
+        lastLineLength = 2 + input.length;
+      };
+
+      const onData = (data) => {
+        const char = data.toString();
+
+        // Handle special keys
+        if (char === '\u0003') { // Ctrl+C
+          process.stdin.setRawMode(false);
+          process.stdin.pause();
+          process.exit();
+        }
+
+        if (char === '\r' || char === '\n') { // Enter
+          process.stdin.setRawMode(false);
+          process.stdin.pause();
+          process.stdin.removeListener('data', onData);
+          process.stdout.write('\n');
+          resolve(input);
+          return;
+        }
+
+        if (char === '\b' || char === '\x7F') { // Backspace
+          if (input.length > 0) {
+            input = input.slice(0, -1);
+            renderLine();
+          }
+          return;
+        }
+
+        // Handle shift key
+        if (char === '\u001B[1;2A' || char === '\u001B[1;2B' || 
+            char === '\u001B[1;2C' || char === '\u001B[1;2D') { // Shift + Arrow keys
+          shiftPressed = true;
+          renderLine();
+          return;
+        }
+
+        // Handle shift release (detected by other keys)
+        if (shiftPressed && char !== '\u001B') {
+          shiftPressed = false;
+          renderLine();
+        }
+
+        // Normal character (only printable)
+        if (char >= ' ' && char <= '~') {
+          input += char;
+          renderLine();
+        }
+      };
+
+      process.stdin.on('data', onData);
     });
   }
 }

@@ -1,10 +1,9 @@
 // Bcode/commands/embed/default-embed-logic.js
-const { ActionRowBuilder, StringSelectMenuBuilder, EmbedBuilder } = require("discord.js");
+const { EmbedBuilder } = require("discord.js");
 
 // Default embed templates used by the embed manager UI
 const defaultEmbeds = {
   manager: {
-    id: "EMB.manager-page",
     embed: new EmbedBuilder()
       .setTitle("Thenks For Using Embed Manager")
       .setDescription(`Embed Manager lets you edit embeds created in your server and send them as examples.\nUpdate this embed to your desire or click list embed below from the drop down for showing what embeds your server holds\nfind out more about DCB [here](https://github.com/Kate-alt-69/SM1)`)
@@ -16,14 +15,11 @@ const defaultEmbeds = {
     components: []
   },
   creating: {
-    id: "EMB.creating-page",
     embed: new EmbedBuilder()
-      .setTitle("Creating New Embed")
-      .setDescription(
-        `this is a default embed you can edit this\n- embed moment`
-      )
-      .setColor(0x5865f2),
-    components: [],
+      .setTitle("Create New Embed")
+      .setDescription("Click **Edit** to start customizing your embed")
+      .setColor("#00ff99")
+      .setTimestamp(),
   },
 };
 module.exports = { defaultEmbeds };

@@ -1,5 +1,8 @@
 {
-  "input.from": "inprompt",
-  "alaRAM": "5000",
-  "alaCPU": "100"
+    "input.from": "inmanage",
+    "alaRAM": "5000",
+    "alaCPU": "100",
+    "alaDISK": "100",
+    "alanet": "true",
+    "lastlog": "000-00-00_00-00-00"
 }

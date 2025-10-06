@@ -3,7 +3,10 @@ import fs from 'fs';
 import path from 'path';
 const settingsPath = path.resolve('./config/settings.json');
 let inputEnabled = true; 
-let checkInterval = null; // Interval for disabled state auto-check
+let checkInterval = null;
+let isSystemLocked = false; // Add lock state tracking
+let terminalBuffer = [];
+let inputHistory = [];
 function loadSettings() {
     if (!fs.existsSync(settingsPath)) return {};
     try {
@@ -64,7 +67,6 @@ export function toggleInput(enable) {
     const settings = loadSettings();
     settings["input.from"] = enable ? 'inmanage' : 'inprompt';
     saveSettings(settings);
-    console.log(` `);
     if (!enable) {
         startDisabledCheck();
     } else {
@@ -84,7 +86,7 @@ export function setInputSource(source) {
  * Returns whether input is currently enabled.
  */
 export function isInputEnabled() {
-    return inputEnabled;
+    return inputEnabled && !isSystemLocked;
 }
 /**
  * Main stdin input handler — silent if disabled.
@@ -108,4 +110,83 @@ export function initInputListener() {
     process.stdin.setEncoding('utf8');
     process.stdin.on('data', (chunk) => handleInput(chunk));
 }
-export default { handleInput, isInputEnabled, setInputSource, toggleInput, refreshInputState };
+export function setLockState(locked) {
+    isSystemLocked = locked;
+    if (locked) {
+        terminalBuffer = [];
+        inputHistory = [];
+        inputEnabled = false;
+    } else {
+        inputEnabled = true;
+    }
+    const settings = loadSettings();
+    settings["input.from"] = locked ? 'inprompt' : 'inmanage';
+    saveSettings(settings);
+}
+
+export function storeOutput(output) {
+    if (!isSystemLocked) return;
+    terminalBuffer.push({
+        type: 'output',
+        content: output,
+        timestamp: Date.now()
+    });
+}
+
+export function storeInput(input) {
+    if (!isSystemLocked) return;
+    inputHistory.push({
+        type: 'input',
+        content: input,
+        timestamp: Date.now()
+    });
+}
+
+export function getStoredContent() {
+    return [...terminalBuffer, ...inputHistory]
+        .sort((a, b) => a.timestamp - b.timestamp)
+        .map(entry => entry.content)
+        .join('\n');
+}
+
+export function clearBuffer() {
+    terminalBuffer = [];
+    inputHistory = [];
+}
+
+export function setRawMode(enabled) {
+    if (process.stdin.isTTY) {
+        process.stdin.setRawMode(enabled);
+        if (enabled) {
+            process.stdin.resume();
+        } else {
+            process.stdin.pause();
+        }
+    }
+}
+
+export function isLocked() {
+    return isSystemLocked;
+}
+
+export function updateActivity() {
+    if (global.tsm) {
+        global.tsm.updateActivity();
+    }
+}
+
+export default { 
+    handleInput, 
+    isInputEnabled, 
+    setInputSource, 
+    toggleInput, 
+    refreshInputState,
+    isLocked,
+    setLockState,
+    updateActivity,
+    storeOutput,
+    storeInput,
+    getStoredContent,
+    clearBuffer,
+    setRawMode
+};

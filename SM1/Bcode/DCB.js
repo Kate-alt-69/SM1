@@ -67,7 +67,109 @@ class Bot extends Client {
             subCommands: 0
         };
         this.emojiCache = null;
+        
+        // Initialize interaction patterns registry
+        this.interactionPatterns = new Map();
+        
+        // Initialize patterns after setup
+        this.setupInteractionPatterns();
+
+        // Initialize interaction patterns registry
+        this.interactionPatterns = new Map();
+        this.initializeDefaultPatterns();
     }
+
+    initializeDefaultPatterns() {
+        // Register default patterns for embed command
+        this.interactionPatterns.set('embed', [
+            { type: 'startsWith', value: 'embed_' },
+            { type: 'startsWith', value: 'edit_' },
+            { type: 'equals', value: 'save_embed' },
+            { type: 'equals', value: 'cancel_embed' },
+            { type: 'regex', value: /^embed[_-].*/ }
+        ]);
+    }
+
+    // Method to register new interaction patterns
+    registerInteractionPattern(commandName, patterns) {
+        this.interactionPatterns.set(commandName, patterns);
+    }
+    setupInteractionPatterns() {
+        // Register default patterns for embed command
+        this.interactionPatterns.set('embed', [
+            { type: 'startsWith', value: 'embed_' },
+            { type: 'startsWith', value: 'edit_' },
+            { type: 'equals', value: 'save_embed' },
+            { type: 'equals', value: 'cancel_embed' },
+            { type: 'regex', value: /^embed[_-].*/ }
+        ]);
+    }
+
+    registerInteractionPattern(commandName, patterns) {
+        if (!Array.isArray(patterns)) {
+            console.error(`Invalid patterns format for command ${commandName}. Expected array.`);
+            return;
+        }
+        
+        const validPatterns = patterns.filter(pattern => {
+            if (!pattern || typeof pattern !== 'object') {
+                console.error(`Invalid pattern for command ${commandName}:`, pattern);
+                return false;
+            }
+            if (!['startsWith', 'endsWith', 'equals', 'contains', 'regex'].includes(pattern.type)) {
+                console.error(`Invalid pattern type for command ${commandName}:`, pattern.type);
+                return false;
+            }
+            if (pattern.type === 'regex' && !(pattern.value instanceof RegExp)) {
+                console.error(`Invalid regex pattern for command ${commandName}:`, pattern.value);
+                return false;
+            }
+            return true;
+        });
+
+        if (validPatterns.length > 0) {
+            this.interactionPatterns.set(commandName, validPatterns);
+        }
+    }
+
+    findCommandFromCustomId(customId) {
+        if (!customId) return null;
+
+        // First try direct command name extraction (traditional format)
+        const [directName] = customId.split(/[-_]/);
+        if (this.commandManager.commands.has(directName)) {
+            return directName;
+        }
+
+        // Then check registered patterns
+        for (const [commandName, patterns] of this.interactionPatterns) {
+            for (const pattern of patterns) {
+                try {
+                    switch (pattern.type) {
+                        case 'startsWith':
+                            if (customId.startsWith(pattern.value)) return commandName;
+                            break;
+                        case 'endsWith':
+                            if (customId.endsWith(pattern.value)) return commandName;
+                            break;
+                        case 'equals':
+                            if (customId === pattern.value) return commandName;
+                            break;
+                        case 'contains':
+                            if (customId.includes(pattern.value)) return commandName;
+                            break;
+                        case 'regex':
+                            if (pattern.value instanceof RegExp && pattern.value.test(customId)) return commandName;
+                            break;
+                    }
+                } catch (error) {
+                    console.error(`Error matching pattern for command ${commandName}:`, error);
+                }
+            }
+        }
+        return null;
+    }
+
     async start() {
         try {
             console.log('[SYSTEM]🔄 Starting bot initialization...');
@@ -352,35 +454,132 @@ class Bot extends Client {
     }
 
     async handleInteraction(interaction) {
-        if (interaction.isButton()) {
-            const handler = this.buttonHandlers.get(interaction.customId);
-            if (handler) {
-                await handler(interaction);
+        try {
+            // Log interaction details
+            console.log(`\n[INTERACTION] Type: ${interaction.type}`);
+            console.log(`   • User: ${interaction.user.tag}`);
+            console.log(`   • Channel: #${interaction.channel?.name ?? 'DM'}`);
+            console.log(`   • Guild: ${interaction.guild?.name ?? 'DM'}`);
+
+            // Handle Chat Input Commands (Slash Commands)
+            if (interaction.isChatInputCommand()) {
+                await this.handleCommand(interaction);
                 return;
             }
 
-            // Handle embed-related buttons
-            const command = this.commandManager.commands.get('embed');
-            if (command && (
-                interaction.customId.startsWith('embed-') ||
-                interaction.customId.startsWith('edit_') ||
-                interaction.customId === 'confirm' ||
-                interaction.customId === 'add_file'
-            )) {
+            // Find responsible command using the pattern registry and customId
+            let commandName = this.findCommandFromCustomId(interaction.customId);
+            
+            // Special handling for embed commands
+            if (!commandName && interaction.customId) {
+                if (interaction.customId.startsWith('embed_') || 
+                    interaction.customId.startsWith('edit_') || 
+                    interaction.customId === 'save_embed' || 
+                    interaction.customId === 'cancel_embed') {
+                    commandName = 'embed';
+                } else {
+                    // Default handling for other commands (commandName-action format)
+                    [commandName] = interaction.customId.split('-');
+                }
+            }
+
+            const command = commandName ? this.commandManager.commands.get(commandName) : null;
+
+            if (!command) {
+                console.log('   ⚠️ No command found for interaction:', interaction.customId);
+                console.log('   • Attempted command name:', commandName);
+                return;
+            }
+
+            console.log(`   • Routing to command: ${commandName}`);
+
+            // Try different handler types in order of preference
+            if (command.handleInteraction) {
+                await command.handleInteraction(interaction);
+                return;
+            }
+
+            // Type-specific handlers
+            if (interaction.isButton() && command.handleButton) {
+                console.log(`   • Button ID: ${interaction.customId}`);
                 await command.handleButton(interaction);
                 return;
             }
-        }
 
-        if (interaction.isModalSubmit() && interaction.customId.startsWith('embed-')) {
-            const command = this.commandManager.commands.get('embed');
-            if (command) {
+            if (interaction.isStringSelectMenu() && command.handleSelectMenu) {
+                console.log(`   • Select Menu ID: ${interaction.customId}`);
+                await command.handleSelectMenu(interaction);
+                return;
+            }
+
+            if (interaction.isModalSubmit() && command.handleModalSubmit) {
+                console.log(`   • Modal ID: ${interaction.customId}`);
                 await command.handleModalSubmit(interaction);
                 return;
             }
-        }
 
-        this.handleCommand(interaction);
+            console.log('   ⚠️ No handler found for interaction type:', interaction.type);
+            
+        } catch (error) {
+            console.error('   ❌ Interaction handler error:', error);
+            
+            // Attempt to notify user of error
+            try {
+                const errorMessage = {
+                    content: 'Something went wrong while processing this interaction.',
+                    ephemeral: true
+                };
+
+                if (!interaction.replied && !interaction.deferred) {
+                    await interaction.reply(errorMessage);
+                } else {
+                    await interaction.followUp(errorMessage);
+                }
+            } catch (replyError) {
+                console.error('   ❌ Failed to send error message:', replyError);
+            }
+        }
+    }
+
+    // Generic handlers for different interaction types
+    async handleGenericButton(interaction) {
+        const { customId } = interaction;
+        
+        // Handle common button patterns
+        if (customId.includes('confirm')) {
+            await interaction.update({ 
+                content: 'Action confirmed!', 
+                components: [] 
+            });
+        } else if (customId.includes('cancel')) {
+            await interaction.update({ 
+                content: 'Action cancelled.', 
+                components: [] 
+            });
+        } else {
+            await interaction.reply({
+                content: 'This button is not configured.',
+                ephemeral: true
+            });
+        }
+    }
+
+    async handleGenericSelectMenu(interaction) {
+        await interaction.reply({
+            content: `Selected options: ${interaction.values.join(', ')}`,
+            ephemeral: true
+        });
+    }
+
+    async handleGenericModal(interaction) {
+        const fields = interaction.fields.fields.map(field => 
+            `${field.customId}: ${field.value}`
+        ).join('\n');
+
+        await interaction.reply({
+            content: 'Modal submitted with values:\n' + fields,
+            ephemeral: true
+        });
     }
 
     async updateStickyMessage(channelId, messageId, content) {
@@ -505,10 +704,23 @@ class Bot extends Client {
 
     // Clean up on shutdown
     async destroy() {
-        if (this.connectionCheckInterval) {
-            clearInterval(this.connectionCheckInterval);
+        try {
+            // Cleanup embed sessions
+            const embedManager = this.commandManager.commands.get('embed');
+            if (embedManager?.cleanupAllSessions) {
+                await embedManager.cleanupAllSessions();
+            }
+            
+            // Clear intervals
+            if (this.connectionCheckInterval) {
+                clearInterval(this.connectionCheckInterval);
+            }
+            
+            // Call parent destroy
+            await super.destroy();
+        } catch (error) {
+            console.error('Error during shutdown:', error);
         }
-        await super.destroy();
     }
 }
 

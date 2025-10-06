@@ -2,12 +2,43 @@
   "name": "activation",
   "version": "1.0.0",
   "description": "Discord Server Management Application",
-  "main": "kernel-launch",
-  "type": "module",
+  "main": "installer.js",
+  "type": "commonjs",
   "scripts": {
     "start": "cd SM1 && node kernel-launch",
-    "install" : "cd SM1 && npm install"
+    "install": "cd SM1 && npm install",
+    "app": "electron installer.js",
+    "build": "pkg installer.js --out-path dist --target win,linux",
+    "build-win": "electron-builder --win",
+    "build-linux": "electron-builder --linux"
+  },
+  "bin": "SM1/kernel-launch.js",
+  "pkg": {
+    "scripts": [
+      "SM1/**/*.js"
+    ],
+    "assets": [
+      "SM1/**/*",
+      "!SM1/node_modules/**/*"
+    ],
+    "targets": [
+      "node18-win-x64",
+      "node18-linux-x64"
+    ],
+    "outputPath": "dist"
   },
   "author": "K8",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "electron": "^38.2.1",
+    "fs-extra": "^11.3.2",
+    "node-fetch": "^2.7.0",
+    "pkg": "5.8.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.0.12"
+  }
 }

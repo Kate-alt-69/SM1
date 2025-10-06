@@ -11,6 +11,26 @@ import { fileURLToPath } from 'url';
 
 import moduleCHK from './Bcode/utils/moduleCHK.js';
 import { bcodePath } from './defined/path-define.js';
+import { terminalManager } from './Utility_Module/TSM.js';
+import { handleInput, toggleInput, initInputListener, setLockState, isLocked,storeOutput,storeInput,getStoredContent,clearBuffer,setRawMode} from './Utility_Module/KNinput.manager.js';
+//import { AuthManager } from "./Utility_Module/auth0.js";
+
+// Initialize terminal state manager before anything else
+const tsm = terminalManager;
+global.tsm = tsm;
+
+// Initialize auth manager with terminal manager
+//const auth = new AuthManager(tsm);
+
+// Set up activity monitoring
+//tsm.onActivity(() => {
+//    if (auth) auth.updateActivity();
+//});
+
+// Make input control globally available
+global.toggleInput = toggleInput;
+global.setLockState = setLockState;
+global.isLocked = isLocked;
 
 // ✅ Setup dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -20,14 +40,14 @@ const __dirname = path.dirname(__filename);
 await moduleCHK.checkAndInstallModules(bcodePath);
 
 // ✅ Step 2: AUTHENTICATION
-import { handleInput, toggleInput, initInputListener } from './Utility_Module/KNinput.manager.js';
-import {AuthManager} from "./Utility_Module/auth0.js"
-toggleInput(false); // Disable CLI while login is pending
-const auth = new AuthManager();
-const loginData = await auth.initAuth(); // Blocks until login succeeds
-console.log(`[AUTH] ✅ Logged in as: ${loginData.username}`);
-initInputListener(); // Start listener only after login
-toggleInput(true);   // Enable CLI now
+//toggleInput(false); // Disable CLI while login is pending
+// Add terminal state to auth manager
+//const loginData = await auth.initAuth(); // Blocks until login succeeds
+//console.log(`[AUTH] ✅ Logged in as: ${loginData.username}`);
+//initInputListener(); // Start listener only after login
+//toggleInput(true);   // Enable CLI now
+// Make toggleInput globally accessible for auth system
+global.toggleInput = toggleInput;
 // ✅ Step 3: Continue startup
 import { KNchecksum } from './Utility_Module/KNchecksum.js';
 import CMDstart from './Utility_Module/CMDstart.js';
@@ -222,7 +242,7 @@ process.stdin.on('data', async (data) => {
       else if (arg === 'relaunch') await Settings.relaunchBot(__filename);
        // ---- New = commands ---- //
       else if (arg === 'passwordreset') await auth.passwordReset();
-      else if (arg === 'lock') await auth.lockTerminal();
+      else if (arg === 'lock') await auth.lockScreen();
       else if (arg === 'accountreset') await auth.accountReset();
       else if (arg === 'accountdetail') auth.accountDetail();
       else if (arg === 'setram') Settings.setRamLimit(arg2);
@@ -232,8 +252,13 @@ process.stdin.on('data', async (data) => {
     }
   } else if (main === '@') {
     if (sub === 'restart') await restartprocess();
-    else if (arg === 'shutdown') await shutdownkernel();
-    else handleInvalidCommand('@', sub, ['restart'], '@ restart');
+    else if (sub === 'shutdown') {
+      console.log('[STARTUP] ⛔️ Shutting down...');
+      if (process.send) process.send('shutdown');
+      console.log('[STARTUP] ✔️ Shutdown complete');
+      process.exit(0);
+    }
+    else handleInvalidCommand('@', sub, ['restart', 'shutdown'], '@ <CMD>');
   } else {
     console.log(`[INPUT] ❌ Invalid input: "${input}"\n[INPUT] 💡 Commands start with '#' or '@'`);
   }
@@ -255,6 +280,20 @@ process.on('SIGTERM', async () => {
 
 process.stdin.resume();
 showPrompt(true);
+
+// Remove the existing keyboard monitor and idle check interval
+// Instead, add this new activity monitor:
+const ACTIVITY_CHECK_INTERVAL = 10000; // Check every 10 seconds
+
+process.stdin.on('data', () => tsm.updateActivity());
+
+// Watch for idle timeout
+//setInterval(async () => {
+//    if (!auth.isLocked && auth.isIdle()) {
+//        await auth.lockScreen();
+//    }
+//}, ACTIVITY_CHECK_INTERVAL);
+
 //,,,,,,,,,,,,,,,,,
 //END OF KERNEL.js |
 //```````````````
