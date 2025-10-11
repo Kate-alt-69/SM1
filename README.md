@@ -34,7 +34,7 @@ DEBUGGER=true
 - LocalHost Dashboard
 - LocalHost CLI (Terminal)
 - [Galactic](https://galactichosting.net/) Hosting Connection
-- Bcode Folder Updates Via [Archive.org](https://archive.org/) 
+- Bcode Folder/Bot Updates Via [Archive.org](https://archive.org/) 
 - More Kernel Commands
 - More bot Commands
 - Multi OS (Operating System) Support (it's hard)
@@ -54,7 +54,7 @@ youtube tutorials about it's functions so i started using [ChatGPT](https://chat
 and yes i did use chatgpt to cleanify my code a little bit since i was a bit lost but in the end it all works great <br>
 and at this time im writing this README.md im still making the jump to DCB-1.2.0 and trust me it's gonna be a MASSIVE jump <br>
 so where ware we yeah it was a bit hard for me to learn discord.js since i couldn't fine any good tutorils about the discord.js<br>since most of them ware jsut begginer lvl coding and i wanted a full on tutorial about discord.js and it's networking and API functions
-## Places You Can Find K8 
+## Places You Can Find K8 (me)
 - Discord you can send me a FR
 ```
   <309000404041547776>
@@ -64,5 +64,37 @@ so where ware we yeah it was a bit hard for me to learn discord.js since i could
  <img width="300" height="300" alt="dhwanksh_qr" src="https://github.com/user-attachments/assets/28e883a5-3060-4aca-bc55-de08e2b1b5af" /><br>
 - [Reddit](https://www.reddit.com/user/Helloiamkate_69/)<br>
 - [Spotify](https://open.spotify.com/user/31b35qefpdsqh2vt7feujr63mygq?si=046a37f1761e48bf)
+
+## How to Add Your Own Program 
+To add your own un-related program to use via KERNEL i have made for full RAW avilable editing and making your node project a bit more customize-able <br>
+
+- Create a starter File Like DCB.js (or Edit Code that runs it aka ```# start``` command)
+This file should have functions or code that will run your programs main file or application giving you a nice look out instead of using ctrl + C many times. <br>
+Example *
+~~~javascript
+import "./YourProgramFolder/main.js";
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+console.log("🚀 DCB.js started! Type a command (ping / hello / exit):");
+
+function prompt() {
+  rl.question("> ", (input) => {
+    if (input === "exit") {
+      console.log("🛑 Shutting down...");
+      rl.close();
+      return;
+    }
+
+    CommandExecutor.execute(input);
+    prompt();
+  });
+}
+
+prompt();
+
+~~~
 
 
