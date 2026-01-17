@@ -1,171 +1,175 @@
-//,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,|
-// kernel-launcher.js (Persistent, Single-Run) |
-//``````````````````````````````````````````````|
+// kernel-launcher.js
+// Purpose: Passive supervisor for KERNEL.js
+// Owns NO terminal, NO input, NO signals
 
 import { spawn } from 'child_process';
+import fs from 'fs';
 import path from 'path';
-import { setTimeout as sleep } from 'timers/promises';
-import fs from "fs";
 import { fileURLToPath } from 'url';
-import TerminalLock from './Utility_Module/terminalLock.js';
+import { setTimeout as sleep } from 'timers/promises';
 
-// Get the directory name of the current module
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const pidFile = path.join(__dirname, "Utility_Module", "PID.json");
+/* ------------------------------------------------------------------ */
+/* paths */
+/* ------------------------------------------------------------------ */
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const KERNEL_PATH = path.resolve(__dirname, 'KERNEL.js');
+const LOG_DIR = path.resolve(__dirname, 'logs');
+const LOG_FILE = path.join(LOG_DIR, 'kernel.log');
+const PID_FILE = path.join(__dirname, 'Utility_Module', 'PID.json');
+
+/* ------------------------------------------------------------------ */
+/* state */
+/* ------------------------------------------------------------------ */
+
 let child = null;
-let running = true; // Changed from false to true for initial start
+let running = true;
+let retries = 0;
 
-// Initialize terminal lock with 5 minutes timeout
-const terminalLock = new TerminalLock(300000); // 5 minutes in milliseconds
+const MAX_RETRIES = 5;
+const RETRY_DELAY_MS = 2000;
 
-const kernelPath = path.resolve('./KERNEL.js');
-const processName = 'SM1-kernel';
+/* ------------------------------------------------------------------ */
+/* utils */
+/* ------------------------------------------------------------------ */
 
-console.log(`[LAUNCHER] 🚀 Launcher started for: ${kernelPath}`);
+function ensureDirs() {
+  if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+  const pidDir = path.dirname(PID_FILE);
+  if (!fs.existsSync(pidDir)) fs.mkdirSync(pidDir, { recursive: true });
+}
+
+function log(line) {
+  const entry = `[${new Date().toISOString()}] ${line}\n`;
+  fs.appendFileSync(LOG_FILE, entry);
+}
+
+function writePid(pid) {
+  let data = {};
+  if (fs.existsSync(PID_FILE)) {
+    try {
+      data = JSON.parse(fs.readFileSync(PID_FILE, 'utf8'));
+    } catch {}
+  }
+  data.kerpid = pid;
+  fs.writeFileSync(PID_FILE, JSON.stringify(data, null, 2));
+}
+
+function clearPid() {
+  if (!fs.existsSync(PID_FILE)) return;
+  try {
+    const data = JSON.parse(fs.readFileSync(PID_FILE, 'utf8'));
+    delete data.kerpid;
+    fs.writeFileSync(PID_FILE, JSON.stringify(data, null, 2));
+  } catch {}
+}
+
+/* ------------------------------------------------------------------ */
+/* kernel control */
+/* ------------------------------------------------------------------ */
 
 async function startKernel() {
-  if (child) {
-    console.log(`[LAUNCHER] ⏳ KERNEL.js is already running (PID: ${child?.pid})`);
-    return;
-  }
+  if (!running) return;
+  if (child) return;
 
-  // Ensure Utility_Module directory exists
-  const utilityModulePath = path.dirname(pidFile);
-  if (!fs.existsSync(utilityModulePath)) {
-    fs.mkdirSync(utilityModulePath, { recursive: true });
-  }
+  retries++;
+  log(`Starting kernel (attempt ${retries}/${MAX_RETRIES})`);
 
-  // Run npm install in the kernel directory if node_modules doesn't exist
-  const kernelDir = path.dirname(kernelPath);
-  if (!fs.existsSync(path.join(kernelDir, 'node_modules'))) {
-    console.log('[LAUNCHER] 📦 Installing dependencies...');
-    try {
-      const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-      const install = spawn(npm, ['install'], {
-        cwd: kernelDir,
-        stdio: 'inherit',
-        shell: true
-      });
-      await new Promise((resolve, reject) => {
-        install.on('close', (code) => {
-          if (code === 0) resolve();
-          else reject(new Error(`npm install failed with code ${code}`));
-        });
-      });
-    } catch (err) {
-      console.error('[LAUNCHER] ❌ Failed to install dependencies:', err);
-      process.exit(1);
+  child = spawn(
+    process.execPath,
+    [KERNEL_PATH],
+    {
+      stdio: [
+        'inherit', // stdin → KERNEL OWNS TTY
+        'inherit', // stdout
+        'inherit', // stderr
+        'ipc'      // IPC only (safe)
+      ],
+      cwd: __dirname
     }
-  }
+  );
 
-  console.log(`[LAUNCHER] 🧠 Starting SM1-kernel process...`);
-  child = spawn('node', ['--title=' + processName, kernelPath], {
-    stdio: ['inherit', 'inherit', 'inherit', 'ipc'],
-    detached: false,
-    cwd: path.dirname(kernelPath)
-  });
+  writePid(child.pid);
+  log(`Kernel started PID=${child.pid}`);
 
-  // Give it a name so it shows up in process listings
-  process.title = 'servermanager1-KERNEL';
-
-  // Save PID to JSON
-  const pidPath = path.resolve('./Utility_Module/PID.json');
-  const pidData = fs.existsSync(pidPath) ? JSON.parse(fs.readFileSync(pidPath, 'utf8')) : {};
-  pidData.kerpid = child.pid;
-  fs.writeFileSync(pidPath, JSON.stringify(pidData, null, 2));
-  running = true;
-  console.log(`[LAUNCHER] 🆔 KERNEL.js started with PID: ${child.pid}`);
-
-  // 🔑 Save kernel PID to PID.json
-  try {
-    let data = {};
-    if (fs.existsSync(pidFile)) {
-      data = JSON.parse(fs.readFileSync(pidFile, "utf8"));
-    }
-    data.kerpid = child.pid;
-    fs.writeFileSync(pidFile, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error("[LAUNCHER] ❌ Failed to write PID.json:", err);
-  }
-
-  let restartRequested = false;
+  /* ---------- IPC ---------- */
 
   child.on('message', async (msg) => {
     if (msg === 'shutdown') {
-      console.log('[LAUNCHER] ⚡ Shutdown requested from KERNEL');
-      running = false; // Prevent restart loop
-      try {
-        // Clean up PID file
-        const pidData = JSON.parse(fs.readFileSync(pidFile, 'utf8'));
-        delete pidData.kerpid;
-        fs.writeFileSync(pidFile, JSON.stringify(pidData, null, 2));
-        
-        // Kill kernel process if still running
-        if (child && !child.killed) {
-          child.kill();
-        }
-      } catch (err) {
-        console.error('[LAUNCHER] Error during shutdown:', err);
-      }
-      process.exit(0); // Exit launcher
+      log('Kernel requested shutdown');
+      running = false;
+      await stopKernel();
+      process.exit(0);
     }
 
-    if (msg === 'restart' && !restartRequested) {
-      restartRequested = true;
-      console.log('[LAUNCHER] 🔄 Restart requested from KERNEL...');
-      try {
-        const pidData = JSON.parse(fs.readFileSync(pidFile, 'utf8'));
-        if (pidData.kerpid) {
-          process.kill(pidData.kerpid, 'SIGTERM');
-        }
-      } catch (err) {
-        console.error('[LAUNCHER] ❌ Failed to kill kernel PID:', err.message);
-      }
-
-      // Wait for process to die before restarting
-      let check = 0;
-      const maxWait = 5000; // 5 seconds
-      while (check < maxWait) {
-        try {
-          process.kill(JSON.parse(fs.readFileSync(pidFile, 'utf8')).kerpid, 0);
-          await sleep(200);
-          check += 200;
-        } catch {
-          break; // PID gone, safe to restart
-        }
-      }
-
-      running = false;
-      restartRequested = false;
-      startKernel();
+    if (msg === 'restart') {
+      log('Kernel requested restart');
+      await stopKernel();
+      await sleep(500);
+      await startKernel();
     }
   });
 
-  child.on('exit', (code, signal) => {
-    console.log(`[LAUNCHER] ❌ KERNEL.js exited with code ${code} (${signal || 'no signal'})`);
+  /* ---------- exit ---------- */
+
+  child.on('exit', async (code, signal) => {
+    log(`Kernel exited code=${code} signal=${signal}`);
+    clearPid();
     child = null;
-    if (running) {
-      // Only restart if not intentionally stopped
-      setTimeout(() => startKernel(), 1000);
+
+    if (!running) return;
+
+    if (retries >= MAX_RETRIES) {
+      log('Max retries exceeded — launcher giving up');
+      process.exit(1);
     }
+
+    log(`Retrying in ${RETRY_DELAY_MS}ms`);
+    await sleep(RETRY_DELAY_MS);
+    await startKernel();
+  });
+
+  child.on('error', (err) => {
+    log(`Kernel spawn error: ${err.stack || err.message}`);
   });
 }
 
-// 🛑 Handle launcher-level shutdown (Ctrl+C, terminal X, SIGTERM)
-process.on('exit', () => {
-  if (child) child.kill();
-});
-process.on('SIGINT', () => process.exit(0));
-process.on('SIGTERM', () => process.exit(0));
+async function stopKernel() {
+  if (!child) return;
 
-// 🔁 Main loop
-(async function loopForever() {
-  // Initial kernel start
-  await startKernel();
+  log(`Stopping kernel PID=${child.pid}`);
 
-  // Keep process alive but don't hammer CPU
-  while (true) {
-    await sleep(3000);
-    if (!running) break;
+  try {
+    child.kill('SIGTERM');
+  } catch {}
+
+  await sleep(500);
+
+  if (child && !child.killed) {
+    try {
+      child.kill('SIGKILL');
+    } catch {}
   }
-})();
+
+  child = null;
+  clearPid();
+}
+
+/* ------------------------------------------------------------------ */
+/* entry */
+/* ------------------------------------------------------------------ */
+
+ensureDirs();
+log('Launcher started');
+
+await startKernel();
+
+/* ------------------------------------------------------------------ */
+/* keep alive (NO stdin, NO signals) */
+/* ------------------------------------------------------------------ */
+
+while (running) {
+  await sleep(5000);
+}

@@ -12,7 +12,7 @@ import { fileURLToPath } from 'url';
 import moduleCHK from './Bcode/utils/moduleCHK.js';
 import { bcodePath } from './defined/path-define.js';
 import { terminalManager } from './Utility_Module/TSM.js';
-import { handleInput, toggleInput, initInputListener, setLockState, isLocked,storeOutput,storeInput,getStoredContent,clearBuffer,setRawMode} from './Utility_Module/KNinput.manager.js';
+//import { handleInput, toggleInput, initInputListener, setLockState, isLocked,storeOutput,storeInput,getStoredContent,clearBuffer,setRawMode} from './Utility_Module/KNinput.manager.js';
 //import { AuthManager } from "./Utility_Module/auth0.js";
 
 // Initialize terminal state manager before anything else
@@ -28,9 +28,9 @@ global.tsm = tsm;
 //});
 
 // Make input control globally available
-global.toggleInput = toggleInput;
-global.setLockState = setLockState;
-global.isLocked = isLocked;
+global.toggleInput = () => {}; // No-op for backward compatibility
+global.setLockState = () => {}; // No-op for backward compatibility
+global.isLocked = false; // No-op for backward compatibility
 
 // ✅ Setup dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -46,14 +46,13 @@ await moduleCHK.checkAndInstallModules(bcodePath);
 //console.log(`[AUTH] ✅ Logged in as: ${loginData.username}`);
 //initInputListener(); // Start listener only after login
 //toggleInput(true);   // Enable CLI now
-// Make toggleInput globally accessible for auth system
-global.toggleInput = toggleInput;
 // ✅ Step 3: Continue startup
 import { KNchecksum } from './Utility_Module/KNchecksum.js';
 import CMDstart from './Utility_Module/CMDstart.js';
 import CMDstop from './Utility_Module/CMDstop.js';
 import Settings from './Utility_Module/FUNCTsetting.js';
-import { commandsJsonPath } from './defined/path-define.js';
+import { getShellEnvironment } from './Utility_Module/ShellEnvironment.js';
+import { commandsJsonPath, settingsPath } from './defined/path-define.js';
 import { setTimeout } from 'timers/promises';
 
 // ✅ Small helper to clear the terminal nicely
@@ -98,23 +97,8 @@ if (!fs.existsSync(commandsJsonPath)) {
 
 // ✅ Load Token Editor
 const { default: TokenEditorUtility } = await import('./Utility_Module/FUNCTtokenEditorUtility.js');
-const tokenEditor = new TokenEditorUtility(() => toggleInput(true)); // Re-enable input after prompt
+const tokenEditor = new TokenEditorUtility(() => {}); // No-op callback for now
 let signalSent = false;
-let promptVisible = false;
-const showPrompt = (force = false) => {
-  if (!promptVisible || force) {
-    process.stdout.write('<<-');
-    promptVisible = true;
-  }
-};
-const clearPrompt = () => {
-  promptVisible = false;
-};
-
-// ✅ Startup Token Check (delegated)
-await tokenEditor.ensureTokenOnStartup();
-showPrompt(true);
-clearTerminal();
 
 // ✅ Restart Logic
 const restartprocess = async () => {
@@ -150,149 +134,147 @@ const suggestClosestCommand = (input, list) =>
 
 const handleInvalidCommand = (scope, input, validList, usage) => {
   const suggestion = suggestClosestCommand(input || '', validList);
-  console.log(`[${scope.toUpperCase()}] ❌ Unknown ${scope}: "${input || 'none'}"`);
-  console.log(`[${scope.toUpperCase()}] 🤔 Did you mean: ${usage.replace('<CMD>', suggestion)}?`);
-  showPrompt(true);
+  shell.writeLine(`[${scope.toUpperCase()}]${scope}"${input || 'none'}"`);
+  shell.writeLine(`[${scope.toUpperCase()}] 🤔 Did you mean: ${usage.replace('<CMD>', suggestion)}?`);
 };
 
-// ✅ CLI Input
-let buffer = '';
-process.stdin.setEncoding('utf8');
-process.stdin.on('data', async (data) => {
-  if (!toggleInput) return; // Ignore if input is disabled
-  clearPrompt();
-
-  buffer += data;
-
-  // Wait until a newline before processing the command
-  if (!buffer.endsWith('\n')) return;
-
-  const input = buffer.trim();
-  buffer = '';
-
-  const [main, sub, arg, arg2] = input.split(' ');
-
-  if (main === '#') {
-    const mainCmds = ['token', 'toggle', 'start', 'stop', 'clear', 'version', 'restart', 'help', 'setting'];
-    if (!mainCmds.includes(sub)) {
-      return handleInvalidCommand('#', sub, mainCmds, '# <CMD>');
+// ✅ Autostart function - checks settings and automatically starts the bot if enabled
+async function checkAndAutostart() {
+  try {
+    if (!fs.existsSync(settingsPath)) {
+      return; // Settings file doesn't exist, skip autostart
     }
 
-    if (sub === 'token') {
-      toggleInput(false); // Disable input while token editor runs
-      await tokenEditor.handleCommand(arg, arg2);
-      toggleInput(true);
-    } else if (sub === 'toggle') {
-      const ToggleManager = (await import('./Utility_Module/FUNCTtoggle.js')).default;
-      if (!arg) {
-        console.log('\n[TOGGLE] 💡 Use "# toggle help" for available subcommands.');
-        return;
-      }
-      if (arg === 'list') ToggleManager.listTogglableCommands();
-      else if (arg === 'on') ToggleManager.enableCommand(arg2);
-      else if (arg === 'off') ToggleManager.disableCommand(arg2);
-      else if (arg === 'update') ToggleManager.regenerateCommandJson();
-      else if (arg === 'cleanup') ToggleManager.deleteSnapshots();
-      else if (arg === 'snapshot') ToggleManager.takeSnapshot();
-      else if (arg === 'rollback' && arg2) ToggleManager.rollbackSnapshot(arg2);
-      else ToggleManager.toggleHelp();
-    } else if (sub === 'start') {
+    const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+    const autostartEnabled = settings.autostart === 'true' || settings.autostart === true;
+
+    if (autostartEnabled) {
+      console.log('[AUTOSTART] 🚀 Autostart enabled - Starting bot automatically...');
+      await new Promise(resolve => setTimeout(resolve, 500)); // Give time for prompt to display
       await CMDstart();
-    } else if (sub === 'stop') {
-      await CMDstop({ stop: true });
-      console.log('[STOP] 🛑 Bot stopped');
-    } else if (sub === 'clear') {
-      clearTerminal();
-    } else if (sub === 'version') {
-      console.log('Version 1.2.0');
-    } else if (sub === 'restart') {
-      console.log('[RESTART] 🚀 Restarting...');
-      await CMDstop({ restart: true });
-    } else if (sub === 'help') {
-      const commands = [
-        { command: '# version', info: 'Check SM1 Version' },
-        { command: '# clear', info: 'clear the terminal' },
-        { command: '# start', info: 'Start the bot' },
-        { command: '# stop', info: 'Stop the bot' },
-        { command: '# restart', info: 'Restart the bot' },
-        { command: '# token help', info: 'Token management commands' },
-        { command: '# toggle help', info: 'Command toggling commands' },
-        { command: '# setting help', info: 'Bot settings commands' },
-        { command: 'how to shutdown', info: 'use the normal CTRL + C to shutdown whole process' }
-      ];
-      console.log('\n┌───┬──────────────────────────┬─────────────────────────────────────────────────────────┐');
-      console.log('│   │ Command                  │ Description                                             │');
-      console.log('├───┼──────────────────────────┼─────────────────────────────────────────────────────────┤');
-      commands.forEach((cmd, i) => {
-        const idx = String(i).padEnd(1);
-        const c = cmd.command.padEnd(24);
-        const d = cmd.info.padEnd(55);
-        console.log(`│ ${idx} │ ${c} │ ${d} │`);
-      });
-      console.log('└───┴──────────────────────────┴─────────────────────────────────────────────────────────┘\n');
-    } else if (sub === 'setting') {
-      if (!arg) {
-        console.log('\n[SETTING] 💡 Use "# setting help" for available subcommands.');
-        return;
-      }
-      if (arg === 'list') console.table(await Settings.listSettings());
-      else if (arg === 'about') console.dir(await Settings.getBotAboutInfo(), { depth: null });
-      else if (arg === 'runerror') await Settings.runErrorCheck(console.log);
-      else if (arg === 'cleanup') console.log(await Settings.cleanUpSettings());
-      else if (arg === 'relaunch') await Settings.relaunchBot(__filename);
-       // ---- New = commands ---- //
-      else if (arg === 'passwordreset') await auth.passwordReset();
-      else if (arg === 'lock') await auth.lockScreen();
-      else if (arg === 'accountreset') await auth.accountReset();
-      else if (arg === 'accountdetail') auth.accountDetail();
-      else if (arg === 'setram') Settings.setRamLimit(arg2);
-      else if (arg === 'setcpu') Settings.setCpuLimit(arg2);
-      else if (arg === 'help') Settings.helpCmd();
-      else console.log('[SETTING] list | about | runerror | cleanup | relaunch | help');
     }
-  } else if (main === '@') {
-    if (sub === 'restart') await restartprocess();
-    else if (sub === 'shutdown') {
-      console.log('[STARTUP] ⛔️ Shutting down...');
-      if (process.send) process.send('shutdown');
-      console.log('[STARTUP] ✔️ Shutdown complete');
-      process.exit(0);
-    }
-    else handleInvalidCommand('@', sub, ['restart', 'shutdown'], '@ <CMD>');
-  } else {
-    console.log(`[INPUT] ❌ Invalid input: "${input}"\n[INPUT] 💡 Commands start with '#' or '@'`);
+  } catch (err) {
+    console.error('[AUTOSTART] ⚠️ Error checking autostart setting:', err.message);
   }
-  showPrompt(true);
+}
+
+// ✅ Initialize Shell Environment (SINGLETON - Only one instance for all I/O)
+const shell = getShellEnvironment();
+
+// ✅ Command Handler for '#' prefix
+async function handleHashCommand(args, signal) {
+  const [sub, arg, arg2] = args.split(' ');
+
+  const mainCmds = ['token', 'toggle', 'start', 'stop', 'clear', 'version', 'restart', 'help', 'setting'];
+  if (!mainCmds.includes(sub)) {
+    const suggestion = suggestClosestCommand(sub || '', mainCmds);
+    shell.writeLine(`[#] ❌ Unknown command: "${sub || 'none'}"`);
+    shell.writeLine(`[#] 🤔 Did you mean: # ${suggestion}?`);
+    return;
+  }
+
+  if (sub === 'token') {
+    await tokenEditor.handleCommand(arg, arg2);
+  } else if (sub === 'toggle') {
+    const ToggleManager = (await import('./Utility_Module/FUNCTtoggle.js')).default;
+    if (!arg) {
+      shell.writeLine('[TOGGLE] 💡 Use "# toggle help" for available subcommands.');
+      return;
+    }
+    if (arg === 'list') ToggleManager.listTogglableCommands();
+    else if (arg === 'on') ToggleManager.enableCommand(arg2);
+    else if (arg === 'off') ToggleManager.disableCommand(arg2);
+    else if (arg === 'update') ToggleManager.regenerateCommandJson();
+    else if (arg === 'cleanup') ToggleManager.deleteSnapshots();
+    else if (arg === 'snapshot') ToggleManager.takeSnapshot();
+    else if (arg === 'rollback' && arg2) ToggleManager.rollbackSnapshot(arg2);
+    else ToggleManager.toggleHelp();
+  } else if (sub === 'start') {
+    await CMDstart();
+  } else if (sub === 'stop') {
+    await CMDstop({ stop: true });
+    shell.writeLine('[STOP] 🛑 Bot stopped');
+  } else if (sub === 'clear') {
+    clearTerminal();
+  } else if (sub === 'version') {
+    shell.writeLine('Version 1.2.0');
+  } else if (sub === 'restart') {
+    shell.writeLine('[RESTART] 🚀 Restarting...');
+    await CMDstop({ restart: true });
+  } else if (sub === 'help') {
+    const commands = [
+      { command: '# version', info: 'Check SM1 Version' },
+      { command: '# clear', info: 'clear the terminal' },
+      { command: '# start', info: 'Start the bot' },
+      { command: '# stop', info: 'Stop the bot' },
+      { command: '# restart', info: 'Restart the bot' },
+      { command: '# token help', info: 'Token management commands' },
+      { command: '# toggle help', info: 'Command toggling commands' },
+      { command: '# setting help', info: 'Bot settings commands' },
+      { command: 'how to shutdown', info: 'use the normal CTRL + C to shutdown whole process' }
+    ];
+    shell.write('\n┌───┬──────────────────────────┬─────────────────────────────────────────────────────────┐\n');
+    shell.write('│   │ Command                  │ Description                                             │\n');
+    shell.write('├───┼──────────────────────────┼─────────────────────────────────────────────────────────┤\n');
+    commands.forEach((cmd, i) => {
+      const idx = String(i).padEnd(1);
+      const c = cmd.command.padEnd(24);
+      const d = cmd.info.padEnd(55);
+      shell.write(`│ ${idx} │ ${c} │ ${d} │\n`);
+    });
+    shell.write('└───┴──────────────────────────┴─────────────────────────────────────────────────────────┘\n');
+  } else if (sub === 'setting') {
+    if (!arg) {
+      shell.writeLine('[SETTING] 💡 Use "# setting help" for available subcommands.');
+      return;
+    }
+    if (arg === 'list') console.table(await Settings.listSettings());
+    else if (arg === 'about') console.dir(await Settings.getBotAboutInfo(), { depth: null });
+    else if (arg === 'runerror') await Settings.runErrorCheck(console.log);
+    else if (arg === 'cleanup') shell.writeLine(await Settings.cleanUpSettings());
+    else if (arg === 'relaunch') await Settings.relaunchBot(__filename);
+    else if (arg === 'setram') Settings.setRamLimit(arg2);
+    else if (arg === 'setcpu') Settings.setCpuLimit(arg2);
+    else if (arg === 'help') Settings.helpCmd();
+    else shell.writeLine('[SETTING] list | about | runerror | cleanup | relaunch | help');
+  }
+}
+
+// ✅ Register command handlers with shell
+shell.register('#', handleHashCommand);
+
+// ✅ Setup shutdown handler
+shell.onShutdown(async () => {
+  try {
+    await Settings.cleanUpSettings();
+  } catch {}
+  if (process.send) process.send('shutdown');
 });
-process.on('SIGINT', async () => {
-  if (signalSent) return;
-  signalSent = true;
-  console.log('\n[CTRL+C] 🔌 Interrupt signal received');
-  await restartprocess();
-});
 
-process.on('SIGTERM', async () => {
-  if (signalSent) return;
-  signalSent = true;
-  console.log('\n[SIGNAL] 🔌 SIGTERM received');
-  await restartprocess();
-});
+// ✅ Startup Token Check (delegated)
+await tokenEditor.ensureTokenOnStartup();
+clearTerminal();
 
-process.stdin.resume();
-showPrompt(true);
+// // ✅ Setup signal handlers
+// process.on('SIGINT', async () => {
+//   if (signalSent) return;
+//   signalSent = true;
+//   shell.writeLine('\n[CTRL+C] 🔌 Interrupt signal received');
+//   await restartprocess();
+// });
 
-// Remove the existing keyboard monitor and idle check interval
-// Instead, add this new activity monitor:
-const ACTIVITY_CHECK_INTERVAL = 10000; // Check every 10 seconds
+// process.on('SIGTERM', async () => {
+//   if (signalSent) return;
+//   signalSent = true;
+//   shell.writeLine('\n[SIGNAL] 🔌 SIGTERM received');
+//   await restartprocess();
+// });
 
-process.stdin.on('data', () => tsm.updateActivity());
+// ✅ Start shell environment with routing
+shell.start();
 
-// Watch for idle timeout
-//setInterval(async () => {
-//    if (!auth.isLocked && auth.isIdle()) {
-//        await auth.lockScreen();
-//    }
-//}, ACTIVITY_CHECK_INTERVAL);
+// ✅ Check and trigger autostart if enabled
+await checkAndAutostart();
 
 //,,,,,,,,,,,,,,,,,
 //END OF KERNEL.js |

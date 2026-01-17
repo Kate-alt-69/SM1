@@ -1,12 +1,12 @@
 {
   "START": "DISCORDSERVERMANAGER",
-  "PID": 24528,
-  "TIMESTAMP": "2025-09-24T17:48:05.101Z",
-  "FILE": "/media/mint/Data/github/codespace/SM1-cursor (pt2)/SM1/SM1/Bcode/DCB.js",
+  "PID": 1260,
+  "TIMESTAMP": "2026-01-17T13:07:11.036Z",
+  "FILE": "G:\\VSC\\Projects Custom\\SM1\\SM1\\Bcode\\DCB.js",
   "botrunning": false,
   "lastError": {
     "code": 1,
     "signal": null,
-    "timestamp": "2025-09-24T17:48:31.544Z"
+    "timestamp": "2026-01-17T13:07:19.114Z"
   }
 }
